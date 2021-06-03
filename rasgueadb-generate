@@ -1,0 +1,140 @@
+#!/usr/bin/env perl
+
+use strict;
+
+use FindBin;
+use Data::Dumper;
+
+use YAML;
+use Template;
+
+
+sub usage {
+    print STDERR "usage: $0 <schema-file> <output-dir>\n";
+    exit 1;
+}
+
+my $schemaFile = shift || usage();
+my $outputDir = shift || usage();
+
+
+my $schema = YAML::LoadFile($schemaFile);
+
+
+## Sanity checking
+
+{
+    die "db name can't include '__': $schema->{db}" if $schema->{db} =~ /__/;
+
+    my $tableIds = {};
+
+    foreach my $tableName (keys %{ $schema->{tables} }) {
+        my $tableId = $schema->{tables}->{$tableName}->{tableId};
+        die "invalid tableId: $tableId (in reserved range)" if $tableId >= 1_000_000 && $tableId < 1_100_000;
+        die "table names can't include '__': $tableName" if $tableName =~ /__/;
+        die "duplicate tableId: $tableId in $tableName" if $tableIds->{$tableId};
+        $tableIds->{$tableId}++;
+    }
+}
+
+## Pre-process indices
+
+foreach my $tableName (keys %{ $schema->{tables} }) {
+    my $table = $schema->{tables}->{$tableName};
+
+    foreach my $field (@{ $table->{fields} }) {
+        $field->{index} = {} if $field->{unique} && !$field->{index}; ## unique implies indexed
+        next if !$field->{index};
+        $field->{index} = {} unless ref $field->{index} eq 'HASH';
+
+        die "duplicate index definition for $tableName / $field->{name}" if $table->{indices}->{$field->{name}};
+
+        my $newIndex = {
+            %{ $field->{index} },
+            accessor => "v." . $field->{name} . "()",
+            integer => integerType($field->{type}),
+        };
+
+        $table->{indices}->{$field->{name}} = $newIndex;
+    }
+}
+
+## Add internal tables
+
+$schema->{tables}->{OpLog} = {
+    tableId => 1_000_000,
+    noOplog => 1,
+    fields => [
+        {
+            name => 'opType',
+            type => 'uint8',  # 0=insert  1=update  2=delete
+        },
+        {
+            name => 'tableId',
+        },
+        {
+            name => 'recordId',
+        },
+        {
+            name => 'timestamp',
+        },
+    ],
+};
+
+
+
+
+if ($ENV{DUMP_SCHEMA}) {
+    print Dumper($schema);
+}
+
+
+
+system("mkdir", "-p", $outputDir) && die $!;
+
+my $tt = Template->new({
+    ABSOLUTE => 1,
+    INCLUDE_PATH => $FindBin::Bin,
+}) || die "$Template::ERROR\n";
+
+$schema->{utils} = {
+    type_to_flatbuffers => sub {
+        my $type = shift;
+        return "uint64" if !defined $type || $type eq '';
+        return "[ubyte]" if $type eq 'ubytes';
+        return $type;
+    },
+
+    type_to_cpp => sub {
+        my $type = shift;
+        return "uint64_t" if !defined $type || $type eq '';
+        return "${type}_t" if $type =~ /^u?int\d+$/;
+        return "std::string_view";
+    },
+};
+
+my $fbsFile = "$outputDir/$schema->{db}.schema.fbs";
+$tt->process("$FindBin::Bin/schema.fbs.tt", $schema, $fbsFile) || die $tt->error(), "\n";
+
+system(qw{flatc --cpp --reflect-names -o}, $outputDir, $fbsFile) && $!;
+
+my $hFile = "$outputDir/$schema->{db}.h";
+$tt->process("$FindBin::Bin/main.h.tt", $schema, $hFile) || die $tt->error(), "\n";
+
+
+
+
+
+
+
+
+#######
+
+sub integerType {
+    my $type = shift;
+
+    return 1 if !defined $type;
+    return 1 if $type =~ /^u?int\d+$/;
+
+    return undef;
+}

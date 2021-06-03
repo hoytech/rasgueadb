@@ -1,0 +1,15 @@
+namespace [% db %];
+
+[% FOREACH tableName IN tables.keys %]
+  [% table = tables.$tableName %]
+  table [% tableName %] {
+    [% FOREACH field IN table.fields %]
+      [% field.name %]: [% utils.type_to_flatbuffers(field.type) %];
+    [% END %]
+  }
+[% END %]
+
+table Empty {
+}
+
+root_type Empty;

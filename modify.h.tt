@@ -1,0 +1,162 @@
+// Insert methods
+
+[% FOREACH table IN tables.keys %]
+
+void _insertIndices_[% table %](lmdb::txn &txn, View_[% table %] &v) {
+    (void)v;
+
+    [% tables.$table.indexPrelude %]
+
+    [% FOREACH index IN tables.$table.indices.keys %]
+    [% integer_index = tables.$table.indices.$index.integer %]
+    [% multi_index = tables.$table.indices.$index.multi %]
+        {
+            [% IF multi_index %]
+                std::vector<[% integer_index ? 'uint64_t' : 'std::string_view' %]> index_key = [% tables.$table.indices.$index.accessor %];
+                for (auto &i : index_key) dbi_[% table %]__[% index %].put(txn, [% IF integer_index %]lmdb::to_sv<uint64_t>[% END %](i), lmdb::to_sv<uint64_t>(v.primaryKeyId));
+            [% ELSE %]
+                [% integer_index ? 'uint64_t' : 'std::string_view' %] index_key = [% tables.$table.indices.$index.accessor %];
+                dbi_[% table %]__[% index %].put(txn, [% IF integer_index %]lmdb::to_sv<uint64_t>[% END %](index_key), lmdb::to_sv<uint64_t>(v.primaryKeyId));
+            [% END %]
+        }
+    [% END %]
+}
+
+void _deleteIndices_[% table %](lmdb::txn &txn, View_[% table %] &v) {
+    (void)v;
+
+    [% tables.$table.indexPrelude %]
+
+    [% FOREACH index IN tables.$table.indices.keys %]
+    [% integer_index = tables.$table.indices.$index.integer %]
+    [% multi_index = tables.$table.indices.$index.multi %]
+    {
+        [% IF multi_index %]
+            std::vector<[% integer_index ? 'uint64_t' : 'std::string_view' %]> index_key = [% tables.$table.indices.$index.accessor %];
+            for (auto &i : index_key) dbi_[% table %]__[% index %].del(txn, [% IF integer_index %]lmdb::to_sv<uint64_t>[% END %](i), lmdb::to_sv<uint64_t>(v.primaryKeyId));
+        [% ELSE %]
+            [% integer_index ? 'uint64_t' : 'std::string_view' %] index_key = [% tables.$table.indices.$index.accessor %];
+            dbi_[% table %]__[% index %].del(txn, [% IF integer_index %]lmdb::to_sv<uint64_t>[% END %](index_key), lmdb::to_sv<uint64_t>(v.primaryKeyId));
+        [% END %]
+    }
+    [% END %]
+}
+
+uint64_t insert_[% table %](lmdb::txn &txn,
+  [% FOREACH field IN tables.$table.fields %]
+    std::optional<[% utils.type_to_cpp(field.type) %]> param__[% field.name %],
+  [% END %]
+  std::optional<View_[% table %]> prev = std::nullopt
+) {
+
+    flatbuffers::FlatBufferBuilder builder;
+
+    {
+        [% FOREACH field IN tables.$table.fields %]
+            if (!param__[% field.name %]) {
+                if (!prev) throw hoytech::error("missing field inserting into [% table %]: ", "[% field.name %]");
+                param__[% field.name %] = prev->[% field.name %]();
+            }
+        [% END %]
+    }
+
+    {
+        [% FOREACH field IN tables.$table.fields %]
+          [% IF field.type == "string" %]
+            auto builder_ptr__[% field.name %] = builder.CreateString(*param__[% field.name %]);
+          [% ELSIF field.type == "ubytes" %]
+            auto builder_ptr__[% field.name %] = builder.CreateVector((uint8_t*)(param__[% field.name %]->data()), param__[% field.name %]->size());
+          [% END %]
+        [% END %]
+
+        [% db %]::[% table %]Builder mb(builder);
+        [% FOREACH field IN tables.$table.fields %]
+          [% IF field.type == "string" || field.type == "ubytes" %]
+            mb.add_[% field.name %](builder_ptr__[% field.name %]);
+          [% ELSE %]
+            mb.add_[% field.name %](*param__[% field.name %]);
+          [% END %]
+        [% END %]
+
+        builder.Finish(mb.Finish());
+    }
+
+    auto buf = std::string_view(reinterpret_cast<char*>(builder.GetBufferPointer()), builder.GetSize());
+
+
+    uint64_t primaryKeyId;
+
+    if (prev) {
+        primaryKeyId = prev->primaryKeyId;
+
+        // If all parameters are the same, update is a no-op
+        if (
+            [% FOREACH field IN tables.$table.fields %]
+                *param__[% field.name %] == prev->[% field.name %]()
+                [% IF !loop.last() %]&&[% END %]
+            [% END %]
+        ) return 0; // NOTE: special return value of 0 indicates no update was done
+
+        dbi_[% table %].put(txn, lmdb::to_sv<uint64_t>(primaryKeyId), buf);
+    } else {
+        [% FOREACH field IN tables.$table.fields %]
+            [% IF field.exists('unique') %]
+                if (count_index(txn, dbi_[% table %]__[% field.name %], *param__[% field.name %]) != 0) {
+                    throw hoytech::error("unique constraint violated on ", "[% table %].[% field.name %]");
+                }
+            [% END %]
+        [% END %]
+
+        [% IF tables.$table.primaryKey %]
+            primaryKeyId = *param__[% tables.$table.primaryKey %];
+        [% ELSE %]
+            primaryKeyId = get_next_integer_key(txn, dbi_[% table %]);
+        [% END %]
+
+        bool inserted = dbi_[% table %].put(txn, lmdb::to_sv<uint64_t>(primaryKeyId), buf, MDB_NOOVERWRITE);
+        if (!inserted) throw hoytech::error("duplicate insert into [% table %]");
+    }
+
+
+    if (prev) _deleteIndices_[% table %](txn, *prev);
+
+    {
+        View_[% table %] v(primaryKeyId, buf);
+        _insertIndices_[% table %](txn, v);
+    }
+
+
+    [% IF !tables.$table.noOplog %]
+        insert_OpLog(txn, prev ? 1 : 0, [% tables.$table.tableId %], primaryKeyId, curr_time_us());
+    [% END %]
+
+    return primaryKeyId;
+}
+
+
+
+void delete_[% table %](lmdb::txn &txn, uint64_t primaryKeyId, bool allowNop = true) {
+    std::string_view buf;
+
+    bool found = dbi_[% table %].get(txn, lmdb::to_sv<uint64_t>(primaryKeyId), buf);
+    if (!found) {
+        if (allowNop) return;
+        throw hoytech::error("unable to find [% table %] record to delete");
+    }
+
+    // assume it's already verified since it's from the DB
+    //bool ok = flatbuffers::Verifier(reinterpret_cast<const uint8_t*>(buf.data()), buf.size()).VerifyBuffer<[% db %]::[% table %]>(nullptr);
+    //if (!ok) throw hoytech::error("verification failed for insert of [% table %]");
+
+    {
+        View_[% table %] v(primaryKeyId, buf);
+        _deleteIndices_[% table %](txn, v);
+    }
+
+    dbi_[% table %].del(txn, lmdb::to_sv<uint64_t>(primaryKeyId));
+
+    insert_OpLog(txn, 2, [% tables.$table.tableId %], primaryKeyId, curr_time_us());
+}
+
+
+[% END %]

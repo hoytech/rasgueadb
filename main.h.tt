@@ -1,0 +1,168 @@
+#pragma once
+
+#include <sys/time.h>
+
+#include <functional>
+#include <string_view>
+#include <optional>
+
+#include "hoytech-cpp/hoytech/error.h"
+#include "lmdbxx/lmdb++.h"
+#include "flatbuffers/flatbuffers.h"
+#include "flatbuffers/minireflect.h"
+
+#include "[% db %].schema_generated.h"
+
+
+namespace [% db %] {
+
+
+
+// Utilities useful in schema.yaml, since non-integer accessors must return a string_view
+
+static inline std::string_view sv(const flatbuffers::Vector<uint8_t> *v) {
+    return std::string_view(reinterpret_cast<const char*>(v->data()), v->size());
+}
+
+static inline std::string_view sv(const flatbuffers::String *v) {
+    return v->string_view();
+}
+
+
+static inline uint64_t curr_time_s() {
+    return ::time(nullptr);
+}
+
+static inline uint64_t curr_time_us() {
+    struct timeval tv;
+    gettimeofday(&tv, nullptr);
+    return (uint64_t)tv.tv_sec * 1000000 + tv.tv_usec;
+}
+
+
+
+class environment {
+  public:
+    environment() {}
+    environment(const environment &) = delete;
+    environment &operator=(environment const &) = delete;
+    environment(environment &&) = delete;
+    environment &operator=(environment &&) = delete;
+
+
+    // Table definitions
+
+    [% FOREACH table IN tables.keys %]
+      static constexpr uint64_t tableId_[% table %] = [% tables.$table.tableId %];
+      lmdb::dbi dbi_[% table %];
+
+      [% FOREACH indexName IN tables.$table.indices.keys %]
+        lmdb::dbi dbi_[% table %]__[% indexName %];
+      [% END %]
+    [% END %]
+
+
+    // Open and init environment
+
+    lmdb::env lmdb_env = lmdb::env::create();
+
+    void open(std::string dir) {
+        lmdb_env.set_max_dbs(64);
+        lmdb_env.set_mapsize(1UL * 1024UL * 1024UL * 1024UL * 1024UL);
+
+        lmdb_env.open(dir.c_str(), MDB_CREATE, 0664);
+
+        lmdb_env.reader_check();
+
+
+        auto txn = txn_rw();
+
+        [% FOREACH table IN tables.keys %]
+          dbi_[% table %] = lmdb::dbi::open(txn, "rasgueadb_[% db %]__[% table %]", MDB_CREATE | MDB_INTEGERKEY);
+
+          [% FOREACH index IN tables.$table.indices.keys %]
+            dbi_[% table %]__[% index %] = lmdb::dbi::open(txn, "rasgueadb_[% db %]__[% table %]__[% index %]", MDB_CREATE | MDB_DUPSORT | MDB_INTEGERDUP [% IF tables.$table.indices.$index.integer %]| MDB_INTEGERKEY[% END %]);
+          [% END %]
+        [% END %]
+
+        txn.commit();
+    }
+
+    void copy_fd(int fd) { lmdb::env_copy_fd(lmdb_env, fd, MDB_CP_COMPACT); }
+
+
+
+    // Transactions
+
+    lmdb::txn txn_rw(MDB_txn* parentTxn = nullptr) {
+        return lmdb::txn::begin(lmdb_env, parentTxn, 0);
+    }
+
+    lmdb::txn txn_ro(MDB_txn* parentTxn = nullptr) {
+        return lmdb::txn::begin(lmdb_env, parentTxn, MDB_RDONLY);
+    }
+
+
+    // Key utilities
+
+    uint64_t get_integer_key_or_zero(lmdb::cursor &cursor, MDB_cursor_op cursorOp = MDB_LAST) {
+        uint64_t id;
+
+        std::string_view k, v;
+
+        if (cursor.get(k, v, cursorOp)) {
+            id = lmdb::from_sv<uint64_t>(k);
+        } else {
+            id = 0;
+        }
+
+        return id;
+    }
+
+    uint64_t get_first_integer_key_or_zero(lmdb::txn &txn, lmdb::dbi &dbi) {
+        auto cursor = lmdb::cursor::open(txn, dbi);
+        return get_integer_key_or_zero(cursor, MDB_FIRST);
+    }
+
+    uint64_t get_largest_integer_key_or_zero(lmdb::txn &txn, lmdb::dbi &dbi) {
+        auto cursor = lmdb::cursor::open(txn, dbi);
+        return get_integer_key_or_zero(cursor, MDB_LAST);
+    }
+
+    uint64_t get_next_integer_key(lmdb::txn &txn, lmdb::dbi &dbi) {
+        return get_largest_integer_key_or_zero(txn, dbi) + 1;
+    }
+
+
+    // OpLog stuff
+
+    inline uint64_t curr_oplog_id(environment &env, lmdb::txn &txn) {
+        return get_largest_integer_key_or_zero(txn, env.dbi_OpLog);
+    }
+
+    class View_OpLog;
+
+    inline void process_new_oplogs(lmdb::txn &txn, std::function<bool(uint64_t, View_OpLog &)> cb, uint64_t lastProcessedOpLogId, std::function<void()> onMissingOpLog) {
+        generic_foreach_raw(txn, dbi_OpLog, [&](std::string_view k, std::string_view v){
+            uint64_t opLogId = lmdb::from_sv<uint64_t>(k);
+            View_OpLog op(opLogId, v);
+
+            if (opLogId == lastProcessedOpLogId) return true; // already processed
+
+            return cb(opLogId, op);
+        }, false, lastProcessedOpLogId, onMissingOpLog);
+    }
+
+
+    // Includes
+
+    [% INCLUDE view.h.tt %]
+    [% INCLUDE modify.h.tt %]
+    [% INCLUDE lookup.h.tt %]
+    [% INCLUDE iteration.h.tt %]
+};
+
+
+
+
+}

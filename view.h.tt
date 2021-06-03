@@ -1,0 +1,31 @@
+// View methods
+
+[% FOREACH table IN tables.keys %]
+
+class View_[% table %] {
+  public:
+    View_[% table %](uint64_t primaryKeyId_, std::string_view buf_) : primaryKeyId(primaryKeyId_), buf(buf_), v(flatbuffers::GetRoot<[% db %]::[% table %]>(buf_.data())) {}
+
+    [% FOREACH field IN tables.$table.fields %]
+      [% utils.type_to_cpp(field.type) %] [% field.name %]() {
+        auto p = v->[% field.name %]();
+        [% IF field.type == "ubytes" || field.type == "string" %]
+            return p ? sv(p) : "";
+        [% ELSE %]
+            return p;
+        [% END %]
+      }
+    [% END %]
+
+    std::string _str() {
+        return flatbuffers::FlatBufferToString((const unsigned char*)buf.data(), [% db %]::[% table %]TypeTable());
+    }
+
+    uint64_t primaryKeyId;
+    std::string_view buf;
+
+  private:
+    const [% db %]::[% table %] *v;
+};
+
+[% END %]

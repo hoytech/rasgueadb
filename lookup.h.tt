@@ -1,0 +1,43 @@
+// Lookup methods
+
+
+inline uint64_t count_index(lmdb::txn &txn, lmdb::dbi &indexDbi, std::optional<std::string_view> indexKey) {
+    if (indexKey) {
+        std::string_view v;
+        auto cursorI = lmdb::cursor::open(txn, indexDbi);
+        if (!cursorI.get(*indexKey, v, MDB_SET)) return 0;
+        return cursorI.count();
+    } else {
+        return indexDbi.size(txn);
+    }
+}
+
+inline uint64_t count_index(lmdb::txn &txn, lmdb::dbi &indexDbi, uint64_t indexKey) {
+    return count_index(txn, indexDbi, lmdb::to_sv<uint64_t>(indexKey));
+}
+
+[% FOREACH table IN tables.keys %]
+
+inline std::optional<View_[% table %]> lookup_[% table %](lmdb::txn &txn, uint64_t primaryKey) {
+    std::string_view buf;
+    bool found = dbi_[% table %].get(txn, lmdb::to_sv<uint64_t>(primaryKey), buf);
+    if (!found) return {};
+    return View_[% table %](primaryKey, buf);
+}
+
+inline std::optional<View_[% table %]> lookup_by_index_[% table %](lmdb::txn &txn, lmdb::dbi &dbi, std::string_view key) {
+    std::string_view primaryKey, buf;
+    if (!dbi.get(txn, key, primaryKey)) return {};
+    if (!dbi_[% table %].get(txn, primaryKey, buf)) throw hoytech::error("internal error: primary key from index not found");
+    return View_[% table %](lmdb::from_sv<uint64_t>(primaryKey), buf);
+}
+
+[% FOREACH indexName IN tables.$table.indices.keys %]
+
+inline std::optional<View_[% table %]> lookup_[% table %]__[% indexName %](lmdb::txn &txn, std::string_view key) {
+    return lookup_by_index_[% table %](txn, dbi_[% table %]__[% indexName %], key);
+}
+
+[% END %]
+
+[% END %]
