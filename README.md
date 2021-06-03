@@ -40,7 +40,7 @@ After compiling the schema, here is an example program that shows how to use the
             txn.commit();
         }
 
-        // Query record
+        // Query a record by userName
 
         {
             auto txn = env.txn_ro();
@@ -53,7 +53,7 @@ After compiling the schema, here is an example program that shows how to use the
 
         {
             auto txn = env.txn_ro();
-            env.foreach_User__userName(txn, [&](example::environment::View_User &view){
+            env.foreach_User(txn, [&](auto &view){
                 std::cout << view.userName() << std::endl;
                 return true; // keep looping
             });
