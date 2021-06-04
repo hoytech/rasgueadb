@@ -43,7 +43,6 @@ foreach my $tableName (keys %{ $schema->{tables} }) {
     my $table = $schema->{tables}->{$tableName};
 
     foreach my $field (@{ $table->{fields} }) {
-        $field->{index} = {} if $field->{unique} && !$field->{index}; ## unique implies indexed
         next if !$field->{index};
         $field->{index} = {} unless ref $field->{index} eq 'HASH';
 
