@@ -1,12 +1,12 @@
 # RasgueaDB
 
-Indexing and querying layer for [LMDB](https://github.com/hoytech/lmdbxx) and [flatbuffers](https://google.github.io/flatbuffers/). Compiles a YAML schema to a C++ header file.
+Indexing and querying layer for [LMDB](https://github.com/hoytech/lmdbxx) and [flatbuffers](https://google.github.io/flatbuffers/).
 
-These wrapper templates let you maintain multiple indices for your records, and maintain those indices on updates and deletions.
+RasgueaDB is a set of templates and a script that uses a YAML schema to generate a C++ header file. This compiled header file provides a framework for inserting, updating, and deleting records. Additionally, it supports indexing your records, and maintaining the indices whenever you perform modifications.
 
-Accessing fields results in `std::string_view`s that point into the LMDB memory map, for zero-copy access.
+Because records are stored as flatbuffers inside LMDB, accessing fields results in [std::string_view](https://github.com/hoytech/lmdbxx#string_view)s that point into the LMDB memory map. Fields that you don't access are never even parsed or loaded, and the ones you do are provided as zero-copy references.
 
-The iteration and querying functionality is flexible, and is all done within the same compilation unit as database access so there is very minimal overhead over using LMDB directly.
+Querying and iteration is simple but flexible. When necessary, you provide lambda callbacks which are inlined in the code, and all query planning, iteration, and database access is done in the same compilation unit, which allows the compiler to optimise it extensively.
 
 
 ## Synopsis
