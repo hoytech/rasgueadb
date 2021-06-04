@@ -2,6 +2,12 @@
 
 Indexing and querying layer for [LMDB](https://github.com/hoytech/lmdbxx) and [flatbuffers](https://google.github.io/flatbuffers/). Compiles a YAML schema to a C++ header file.
 
+These wrapper templates let you maintain multiple indices for your records, and maintain those indices on updates and deletions.
+
+Accessing fields results in `std::string_view`s that point into the LMDB memory map, for zero-copy access.
+
+The iteration and querying functionality is flexible, and is all done within the same compilation unit as database access so there is very minimal overhead over using LMDB directly.
+
 
 ## Synopsis
 
@@ -218,3 +224,11 @@ IMPORTANT: When deriving index values, given the same view (accessible as `v`) y
 A `multi` modifier can also be added to an index definition. This is for when a record should get multiple entries in the same index.
 
 The test-suite has an example where a `words` field is split up into individual words and each is added to a multi-index. This way you can query for all records that contain a particular word somewhere in their `words` field.
+
+## Author and Copyright
+
+RasgueaDB © 2021 Doug Hoyte.
+
+2-clause BSD license. See the LICENSE file.
+
+Does this stuff interest you? Subscribe for news on my upcoming book: [Zero Copy](https://leanpub.com/zerocopy)!
