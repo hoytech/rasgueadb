@@ -56,6 +56,11 @@ foreach my $tableName (keys %{ $schema->{tables} }) {
 
         $table->{indices}->{$field->{name}} = $newIndex;
     }
+
+    foreach my $indexName (keys %{ $table->{indices} }) {
+        my $index = $table->{indices}->{$indexName};
+        die "indices with multi and unique are not supported ($tableName.$indexName)" if $index->{multi} && $index->{unique};
+    }
 }
 
 ## Add internal tables

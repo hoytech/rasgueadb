@@ -63,7 +63,7 @@ After compiling the schema, here is an example program that shows how to use the
         return 0;
     }
 
-## Insertion
+## Insert
 
 Insert a new record:
 
@@ -105,6 +105,22 @@ If you use the C++20 way with [designated initialisers](https://en.cppreference.
 To delete a record, you need its primary key, which you can retrieve from a view:
 
     env.delete_User(txn, view.primaryKeyId);
+
+
+## Unique
+
+A `unique` modifier can be specified on an index:
+
+        fields:
+          - name: userName
+            type: string
+            index:
+              unique: true
+
+When you insert a record it will check that no other records have the same value for this index. If there are, then it will throw an exception.
+
+By default duplicates *are* allowed, and in the index these duplicates are be sorted by primary key.
+
 
 ## Lookup by index
 
@@ -154,19 +170,51 @@ The next optional argument is a boolean that signifies the index should be itera
         return true;
     }, std::nullopt, true);
 
-## Unique
+## Iteration over dup records
 
-If you specify `unique` in your schema (see the `userName` field in the synopsis) then when you insert a record it will make sure no other records have the same value for this index. If there are, then it will throw an exception.
-
-However, by default duplicates are allowed, and in the index these duplicates will be sorted by primary key.
-
-## Iteration of dup records
-
-Loop over all records with a particular value for an indexed field:
+Unless an index is marked `unique`, there can be multiple records with the same value. Here is how to loop over all records that have a particular indexed value:
 
     env.foreachDup_User__created(txn, lmdb::to_sv<uint64_t>(1001), [&](auto &view){
         // ...
         return true;
     });
 
+## Derived indices
+
+Although you can say that a particular field is indexed by adding an `index` key to the field, you can also have indices that don't directly correspond to fields. You can construct their values with arbitrary C++ code by including an `indexPrelude` and then a set of `indices` to add:
+
+As an example, here is definition of a table that maintains indices of its two fields in lower-case:
+
+      Person:
+        tableId: 2
+
+        fields:
+          - name: fullName
+            type: string
+          - name: email
+            type: string
+
+        indexPrelude: |
+          std::string fullNameLC = std::string(v.fullName());
+          std::string emailLC = std::string(v.email());
+          std::transform(fullNameLC.begin(), fullNameLC.end(), fullNameLC.begin(), ::tolower);
+          std::transform(emailLC.begin(), emailLC.end(), emailLC.begin(), ::tolower);
+
+        indices:
+          fullNameLC:
+            accessor: 'fullNameLC'
+          emailLC:
+            accessor: 'emailLC'
+            unique: true
+
+Now records can be queried using the index without worrying about casing, but the original user's chosen casing is preserved.
+
+Note that the `emailLC` index is also `unique`. This will prevent duplicated records from being inserted, even if the casing is different.
+
+IMPORTANT: When deriving index values, given the same view (accessible as `v`) you must always compute the exact same index values, otherwise your database will become corrupted. It is recommended to only use data from `v` to compute the values (and nothing else).
+
 ## Multi-indices
+
+A `multi` modifier can also be added to an index definition. This is for when a record should get multiple entries in the same index.
+
+The test-suite has an example where a `words` field is split up into individual words and each is added to a multi-index. This way you can query for all records that contain a particular word somewhere in their `words` field.

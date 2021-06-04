@@ -9,14 +9,14 @@ void _insertIndices_[% table %](lmdb::txn &txn, View_[% table %] &v) {
 
     [% FOREACH index IN tables.$table.indices.keys.sort() %]
         [% indexDef = tables.$table.indices.$index %]
-        [% integer_index = tables.$table.indices.$index.integer %]
-        [% multi_index = tables.$table.indices.$index.multi %]
+        [% integer_index = indexDef.integer %]
+        [% multi_index = indexDef.multi %]
         {
             [% IF multi_index %]
-                std::vector<[% integer_index ? 'uint64_t' : 'std::string_view' %]> index_key = [% tables.$table.indices.$index.accessor %];
+                std::vector<[% integer_index ? 'uint64_t' : 'std::string_view' %]> index_key = [% indexDef.accessor %];
                 for (auto &i : index_key) dbi_[% table %]__[% index %].put(txn, [% IF integer_index %]lmdb::to_sv<uint64_t>[% END %](i), lmdb::to_sv<uint64_t>(v.primaryKeyId));
             [% ELSE %]
-                [% integer_index ? 'uint64_t' : 'std::string_view' %] index_key = [% tables.$table.indices.$index.accessor %];
+                [% integer_index ? 'uint64_t' : 'std::string_view' %] index_key = [% indexDef.accessor %];
 
                 [% IF indexDef.exists('unique') %]
                     std::string_view junk;
@@ -36,15 +36,16 @@ void _deleteIndices_[% table %](lmdb::txn &txn, View_[% table %] &v) {
 
     [% tables.$table.indexPrelude %]
 
-    [% FOREACH index IN tables.$table.indices.keys %]
-    [% integer_index = tables.$table.indices.$index.integer %]
-    [% multi_index = tables.$table.indices.$index.multi %]
+    [% FOREACH index IN tables.$table.indices.keys.sort() %]
+        [% indexDef = tables.$table.indices.$index %]
+        [% integer_index = indexDef.integer %]
+        [% multi_index = indexDef.multi %]
     {
         [% IF multi_index %]
-            std::vector<[% integer_index ? 'uint64_t' : 'std::string_view' %]> index_key = [% tables.$table.indices.$index.accessor %];
+            std::vector<[% integer_index ? 'uint64_t' : 'std::string_view' %]> index_key = [% indexDef.accessor %];
             for (auto &i : index_key) dbi_[% table %]__[% index %].del(txn, [% IF integer_index %]lmdb::to_sv<uint64_t>[% END %](i), lmdb::to_sv<uint64_t>(v.primaryKeyId));
         [% ELSE %]
-            [% integer_index ? 'uint64_t' : 'std::string_view' %] index_key = [% tables.$table.indices.$index.accessor %];
+            [% integer_index ? 'uint64_t' : 'std::string_view' %] index_key = [% indexDef.accessor %];
             dbi_[% table %]__[% index %].del(txn, [% IF integer_index %]lmdb::to_sv<uint64_t>[% END %](index_key), lmdb::to_sv<uint64_t>(v.primaryKeyId));
         [% END %]
     }

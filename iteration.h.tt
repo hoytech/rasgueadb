@@ -115,7 +115,7 @@ inline void foreach_[% table %](lmdb::txn &txn, std::function<bool(View_[% table
 }
 
 
-[% FOREACH indexName IN tables.$table.indices.keys %]
+[% FOREACH indexName IN tables.$table.indices.keys.sort() %]
 [% index = tables.$table.indices.$indexName %]
 
 inline void foreach_[% table %]__[% indexName %](lmdb::txn &txn, std::function<bool(View_[% table %]&)> cb, std::optional<std::string_view> startKey = std::nullopt, bool reverse = false, uint64_t *count = nullptr) {
