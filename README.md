@@ -125,7 +125,7 @@ A `unique` modifier can be specified on an index:
 
 When you insert a record it will check that no other records have the same value for this index. If there are, then it will throw an exception.
 
-By default duplicates *are* allowed, and in the index these duplicates are be sorted by primary key.
+By default duplicates *are* allowed, and in the index these duplicates are sorted by primary key.
 
 
 ## Lookup by index
@@ -150,6 +150,8 @@ To iterate over a whole table:
     });
 
 Your callback must return a `bool` which indicates whether the looping should continue. You can use this to implement `LIMIT`-like functionality. Note: If you forget the `return true` you'll get a really inscrutable compile-time error.
+
+The records will be iterated over in order of their primary keys.
 
 ## Iteration over index
 
