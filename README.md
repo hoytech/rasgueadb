@@ -88,13 +88,17 @@ For example, here is how you can lookup the record with the primary key of `2`:
 
 ## Update
 
-Updating a record is done in the same way as inserting, except that you pass a view object of the record you want to update as the last parameter, and that any parameters you don't want to update should be `std::nullopt`.
+To Update a record (C++20):
 
-For example, to update just the `userName` field on a `User`:
+    env.update_User(txn, view, { .userName = "new username", });
 
-    env.insert_User(txn, "new username", std::nullopt, std::nullopt, view);
+When you update, all the indices will be updated as well. Like inserts, updates can fail if a unique constraint is violated.
 
-When you update, all the indices will be updated as well.
+If you use the C++20 way with [designated initialisers](https://en.cppreference.com/w/cpp/language/aggregate_initialization) then the fields must be in the same order as they are defined in the schema otherwise you will get a compile-time error. If you don't want to use designated initialisers, you can do it like this:
+
+    example::environment::Updates_User upd;
+    upd.username = "new username";
+    env.update_User(txn, view, upd);
 
 ## Delete
 

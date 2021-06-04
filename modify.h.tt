@@ -44,7 +44,7 @@ void _deleteIndices_[% table %](lmdb::txn &txn, View_[% table %] &v) {
 
 uint64_t insert_[% table %](lmdb::txn &txn,
   [% FOREACH field IN tables.$table.fields %]
-    std::optional<[% utils.type_to_cpp(field.type) %]> param__[% field.name %],
+    [% utils.type_to_cpp(field.type) %] param__[% field.name %],
   [% END %]
   std::optional<View_[% table %]> prev = std::nullopt
 ) {
@@ -53,19 +53,10 @@ uint64_t insert_[% table %](lmdb::txn &txn,
 
     {
         [% FOREACH field IN tables.$table.fields %]
-            if (!param__[% field.name %]) {
-                if (!prev) throw hoytech::error("missing field inserting into [% table %]: ", "[% field.name %]");
-                param__[% field.name %] = prev->[% field.name %]();
-            }
-        [% END %]
-    }
-
-    {
-        [% FOREACH field IN tables.$table.fields %]
           [% IF field.type == "string" %]
-            auto builder_ptr__[% field.name %] = builder.CreateString(*param__[% field.name %]);
+            auto builder_ptr__[% field.name %] = builder.CreateString(param__[% field.name %]);
           [% ELSIF field.type == "ubytes" %]
-            auto builder_ptr__[% field.name %] = builder.CreateVector((uint8_t*)(param__[% field.name %]->data()), param__[% field.name %]->size());
+            auto builder_ptr__[% field.name %] = builder.CreateVector((uint8_t*)(param__[% field.name %].data()), param__[% field.name %].size());
           [% END %]
         [% END %]
 
@@ -74,7 +65,7 @@ uint64_t insert_[% table %](lmdb::txn &txn,
           [% IF field.type == "string" || field.type == "ubytes" %]
             mb.add_[% field.name %](builder_ptr__[% field.name %]);
           [% ELSE %]
-            mb.add_[% field.name %](*param__[% field.name %]);
+            mb.add_[% field.name %](param__[% field.name %]);
           [% END %]
         [% END %]
 
@@ -92,7 +83,7 @@ uint64_t insert_[% table %](lmdb::txn &txn,
         // If all parameters are the same, update is a no-op
         if (
             [% FOREACH field IN tables.$table.fields %]
-                *param__[% field.name %] == prev->[% field.name %]()
+                param__[% field.name %] == prev->[% field.name %]()
                 [% IF !loop.last() %]&&[% END %]
             [% END %]
         ) return 0; // NOTE: special return value of 0 indicates no update was done
@@ -101,14 +92,14 @@ uint64_t insert_[% table %](lmdb::txn &txn,
     } else {
         [% FOREACH field IN tables.$table.fields %]
             [% IF field.exists('unique') %]
-                if (count_index(txn, dbi_[% table %]__[% field.name %], *param__[% field.name %]) != 0) {
+                if (count_index(txn, dbi_[% table %]__[% field.name %], param__[% field.name %]) != 0) {
                     throw hoytech::error("unique constraint violated on ", "[% table %].[% field.name %]");
                 }
             [% END %]
         [% END %]
 
         [% IF tables.$table.primaryKey %]
-            primaryKeyId = *param__[% tables.$table.primaryKey %];
+            primaryKeyId = param__[% tables.$table.primaryKey %];
         [% ELSE %]
             primaryKeyId = get_next_integer_key(txn, dbi_[% table %]);
         [% END %]
@@ -132,6 +123,19 @@ uint64_t insert_[% table %](lmdb::txn &txn,
 
     return primaryKeyId;
 }
+
+
+
+struct Updates_[% table %] {
+  [% FOREACH field IN tables.$table.fields %]
+    std::optional<[% utils.type_to_cpp(field.type) %]> [% field.name %];
+  [% END %]
+};
+
+void update_[% table %](lmdb::txn &txn, View_[% table %] prev, Updates_[% table %] upd) {
+    insert_[% table %](txn, [% FOREACH field IN tables.$table.fields %]upd.[% field.name %] ? *upd.[% field.name %] : prev.[% field.name %](), [% END %]prev);
+}
+
 
 
 
