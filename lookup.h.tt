@@ -33,9 +33,10 @@ inline std::optional<View_[% table %]> lookup_by_index_[% table %](lmdb::txn &tx
 }
 
 [% FOREACH indexName IN tables.$table.indices.keys %]
+[% indexDef = tables.$table.indices.$indexName %]
 
-inline std::optional<View_[% table %]> lookup_[% table %]__[% indexName %](lmdb::txn &txn, std::string_view key) {
-    return lookup_by_index_[% table %](txn, dbi_[% table %]__[% indexName %], key);
+inline std::optional<View_[% table %]> lookup_[% table %]__[% indexName %](lmdb::txn &txn, [% utils.index_name_to_type(indexDef) %] key) {
+    return lookup_by_index_[% table %](txn, dbi_[% table %]__[% indexName %], [% utils.index_conversion(indexDef) %](key));
 }
 
 [% END %]

@@ -115,6 +115,18 @@ $schema->{utils} = {
         return "${type}_t" if $type =~ /^u?int\d+$/;
         return "std::string_view";
     },
+
+    index_name_to_type => sub {
+        my $indexDef = shift;
+        return "uint64_t" if $indexDef->{integer};
+        return "std::string_view";
+    },
+
+    index_conversion => sub {
+        my $indexDef = shift;
+        return "lmdb::to_sv<uint64_t>" if $indexDef->{integer};
+        return "";
+    }
 };
 
 my $fbsFile = "$outputDir/$schema->{db}.schema.fbs";

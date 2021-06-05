@@ -120,17 +120,17 @@ inline void foreach_[% table %](lmdb::txn &txn, std::function<bool(View_[% table
 
 
 [% FOREACH indexName IN tables.$table.indices.keys.sort() %]
-[% index = tables.$table.indices.$indexName %]
+[% indexDef = tables.$table.indices.$indexName %]
 
-inline void foreach_[% table %]__[% indexName %](lmdb::txn &txn, std::function<bool(View_[% table %]&)> cb, bool reverse = false, std::optional<std::string_view> startKey = std::nullopt, uint64_t *count = nullptr) {
-    foreach_by_index(txn, dbi_[% table %], dbi_[% table %]__[% indexName %], startKey, std::nullopt, [&](uint64_t primaryKeyId, std::string_view v){
+inline void foreach_[% table %]__[% indexName %](lmdb::txn &txn, std::function<bool(View_[% table %]&)> cb, bool reverse = false, std::optional<[% utils.index_name_to_type(indexDef) %]> startKey = std::nullopt, uint64_t *count = nullptr) {
+    foreach_by_index(txn, dbi_[% table %], dbi_[% table %]__[% indexName %], startKey ? std::optional<std::string_view>([% utils.index_conversion(indexDef) %](*startKey)) : std::nullopt, std::nullopt, [&](uint64_t primaryKeyId, std::string_view v){
         View_[% table %] view(primaryKeyId, v);
         return cb(view);
     }, reverse, count);
 }
 
-inline void foreachDup_[% table %]__[% indexName %](lmdb::txn &txn, std::string_view k, std::function<bool(View_[% table %]&)> cb, bool reverse = false, std::optional<uint64_t> startingPoint = std::nullopt, uint64_t *count = nullptr) {
-    generic_foreach_index(txn, dbi_[% table %], dbi_[% table %]__[% indexName %], k, [&cb](uint64_t primaryKeyId, std::string_view v){
+inline void foreachDup_[% table %]__[% indexName %](lmdb::txn &txn, [% utils.index_name_to_type(indexDef) %] k, std::function<bool(View_[% table %]&)> cb, bool reverse = false, std::optional<uint64_t> startingPoint = std::nullopt, uint64_t *count = nullptr) {
+    generic_foreach_index(txn, dbi_[% table %], dbi_[% table %]__[% indexName %], [% utils.index_conversion(indexDef) %](k), [&cb](uint64_t primaryKeyId, std::string_view v){
         View_[% table %] view(primaryKeyId, v);
         return cb(view);
     }, reverse, startingPoint ? *startingPoint : 0, count);

@@ -29,6 +29,10 @@ Here is a simple example schema:
 
 * The `db` field is a name for your database. It will be used for namespacing in the generated files and the database table names.
 * Each table should have a numeric `tableId`. This is used to track updates in the OpLog.
+* There are currently only 3 types supported:
+  * `uint64`: Unsigned 64-bit integer. This is the default when no type is specified.
+  * `string`: Arbitrary byte-string.
+  * `ubytes`: Identical to `string`, except for how it is displayed when debugging.
 
 After compiling the schema, here is an example program that shows how to use the generated header:
 
@@ -79,8 +83,6 @@ Insert a new record:
 This must be done inside a read-write transaction (this is also the case for updates and deletions).
 
 After the `txn` transaction handle, the following arguments correspond to the fields defined for this table in your schema.
-
-All fields are `std::string_view`s, except for integer fields. There is no difference between `string` and `ubytes` schema types, except for how they are displayed during debugging.
 
 This call can throw an exception if a unique constraint is violated (see below).
 
@@ -150,10 +152,6 @@ Note: The table name is separated from the index name by two underscores.
 
 If there are multiple records with the same value, then it will return the first one it finds.
 
-For an integer index, you have to convert the value to a `string_view`:
-
-    auto view = env.lookup_User__created(txn, lmdb::to_sv<uint64_t>(1001));
-
 ## Iteration over table
 
 To iterate over a whole table:
@@ -197,16 +195,16 @@ The combination of starting records and the "continue looping" boolean returned 
 
 ## Iteration over dup records
 
-Unless an index is marked `unique`, there can be multiple records with the same indexed value. Here is how to loop over all records that have a particular indexed value:
+Unless an index is marked `unique`, there can be multiple records with the same indexed value. Here is how to loop over all records that have a particular indexed value (`1001` here):
 
-    env.foreachDup_User__created(txn, lmdb::to_sv<uint64_t>(1001), [&](auto &view){
+    env.foreachDup_User__created(txn, 1001, [&](auto &view){
         // ...
         return true;
     });
 
 Similar to iteration over and index, `reverse` and `start` parameters are accepted:
 
-    env.foreachDup_User__created(txn, lmdb::to_sv<uint64_t>(1001), [&](auto &view){
+    env.foreachDup_User__created(txn, 1001, [&](auto &view){
         // ...
         return true;
     }, reverse, start);
@@ -217,7 +215,7 @@ There is also a `count` optional parameter. If passed, it should be a pointer to
 
     uint64_t total;
 
-    env.foreachDup_User__created(txn, lmdb::to_sv<uint64_t>(1001), [&](auto &view){
+    env.foreachDup_User__created(txn, 1001, [&](auto &view){
         // ...
         return true;
     }, reverse, start, &total);
