@@ -4,7 +4,7 @@ RasgueaDB is an indexing and query layer for [LMDB](https://github.com/hoytech/l
 
 Because records are stored as flatbuffers inside LMDB, accessing fields results in [std::string_view](https://github.com/hoytech/lmdbxx#string_view)s that point into the LMDB memory map. Fields that you don't access are never even parsed or loaded, and the ones you do are provided as zero-copy references. Even for relatively small values that don't benefit from the zero-copy itself, an often overlooked benefit is that there are no memory allocations required to read a record.
 
-Querying and iteration is simple but flexible. When looping over records you provide lambda callbacks. These callbacks and all and database access reside in the same compilation unit, which allows the compiler to optimise it extensively.
+Querying and iteration is simple but flexible. When looping over records you provide lambda callbacks. These callbacks, the wrapper code, and all database access reside in the same compilation unit, which allows the compiler to optimise it extensively.
 
 
 ## Synopsis
@@ -26,6 +26,9 @@ Here is a simple example schema:
           - name: created
             index: true
             ## default type is uint64
+
+* The `db` field is a name for your database. It will be used for namespacing in the generated files and the database table names.
+* Each table should have a numeric `tableId`. This is used to track updates in the OpLog.
 
 After compiling the schema, here is an example program that shows how to use the generated header:
 
@@ -73,7 +76,7 @@ Insert a new record:
 
     env.insert_User(txn, "john", "\x01\x02\x03", 1000);
 
-This must be done inside a read-write transaction (this also holds for updates and deletions).
+This must be done inside a read-write transaction (this is also the case for updates and deletions).
 
 After the `txn` transaction handle, the following arguments correspond to the fields defined for this table in your schema.
 
@@ -100,7 +103,7 @@ For example, here is how you can lookup the record with a primary key of `2`:
 
 ## Update
 
-Update a record (C++20 only):
+Update a record (C++20 syntax):
 
     env.update_User(txn, view, { .userName = "new username", });
 
@@ -132,7 +135,7 @@ A `unique` modifier can be specified on an index:
             index:
               unique: true
 
-When you insert a record it will check that no other records have the same value for this index. If there are, then exception will be thrown.
+When you insert or update a record it will check that no other records have the same value for this index. If there are, then exception will be thrown.
 
 By default duplicates *are* allowed, and in the index these duplicates are sorted by primary key.
 
@@ -160,7 +163,7 @@ To iterate over a whole table:
         return true;
     });
 
-Your callback must return a `bool` which indicates whether the looping should continue. You can use this to implement `LIMIT`-like functionality. Note: If you forget the `return true` you'll get a really inscrutable compile-time error.
+Your callback must return a `bool` which indicates whether the looping should continue. By returning false early you can implement `LIMIT`-like functionality. Note: If you forget the `return true` you'll get a inscrutable compile-time error.
 
 The records will be iterated over in order of their primary keys.
 
@@ -194,7 +197,7 @@ The combination of starting records and the "continue looping" boolean returned 
 
 ## Iteration over dup records
 
-Unless an index is marked `unique`, there can be multiple records with the same value. Here is how to loop over all records that have a particular indexed value:
+Unless an index is marked `unique`, there can be multiple records with the same indexed value. Here is how to loop over all records that have a particular indexed value:
 
     env.foreachDup_User__created(txn, lmdb::to_sv<uint64_t>(1001), [&](auto &view){
         // ...
@@ -208,9 +211,9 @@ Similar to iteration over and index, `reverse` and `start` parameters are accept
         return true;
     }, reverse, start);
 
-`start` corresponds to the primary key of the record you would like to start with (which is always of type `uint64`). `0` corresponds to no starting point.
+`start` corresponds to the primary key of the record you would like to start with (which is always of type `uint64`).
 
-There is also a `count` optional parameter. If passed, it should be a pointer to a `uint64`. After the iteration is done, the total number of dups will be stored in this variable (even if you stop looping prematurely).
+There is also a `count` optional parameter. If passed, it should be a pointer to a `uint64_t`. After the iteration is done, the total number of dups will be stored in this variable (even if you stop looping prematurely).
 
     uint64_t total;
 
@@ -264,6 +267,14 @@ A `multi` modifier can also be added to an index definition. This is for when a 
 The test-suite has an example where a `words` field is split up into individual words and each is added to a multi-index. This way you can query for all records that contain a particular word somewhere in their `words` field.
 
 For multi-indices, the variable referred to by `accessor` should be of type `std::vector<>`.
+
+
+
+## OpLog
+
+A special table `OpLog` is automatically added to your schema. This is a record of modifications to the DB, and is useful for streaming updates to users, and/or for replication.
+
+
 
 
 ## Author and Copyright
