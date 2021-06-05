@@ -77,18 +77,22 @@ inline void foreach_by_index(lmdb::txn &txn, lmdb::dbi &tableDbi, lmdb::dbi &ind
 
         if (!cursorI.get(k, v, MDB_SET_RANGE)) return;
 
-        // count is not supported: always 0
+        if (reverse && k != *startKey) cursorI.get(k, v, MDB_PREV);
     } else if (indexKey) {
         k = *indexKey;
         if (!cursorI.get(k, v, MDB_SET)) return;
 
         cursorI.get(k, v, reverse ? MDB_LAST_DUP : MDB_FIRST_DUP);
-
-        if (count) *count = cursorI.count();
     } else {
         if (!cursorI.get(k, v, reverse ? MDB_LAST : MDB_FIRST)) return;
+    }
 
-        if (count) *count = indexDbi.size(txn);
+    if (count) {
+        if (indexKey) {
+            *count = cursorI.count();
+        } else {
+            *count = indexDbi.size(txn);
+        }
     }
 
     do {
@@ -118,18 +122,18 @@ inline void foreach_[% table %](lmdb::txn &txn, std::function<bool(View_[% table
 [% FOREACH indexName IN tables.$table.indices.keys.sort() %]
 [% index = tables.$table.indices.$indexName %]
 
-inline void foreach_[% table %]__[% indexName %](lmdb::txn &txn, std::function<bool(View_[% table %]&)> cb, std::optional<std::string_view> startKey = std::nullopt, bool reverse = false, uint64_t *count = nullptr) {
+inline void foreach_[% table %]__[% indexName %](lmdb::txn &txn, std::function<bool(View_[% table %]&)> cb, bool reverse = false, std::optional<std::string_view> startKey = std::nullopt, uint64_t *count = nullptr) {
     foreach_by_index(txn, dbi_[% table %], dbi_[% table %]__[% indexName %], startKey, std::nullopt, [&](uint64_t primaryKeyId, std::string_view v){
         View_[% table %] view(primaryKeyId, v);
         return cb(view);
     }, reverse, count);
 }
 
-inline void foreachDup_[% table %]__[% indexName %](lmdb::txn &txn, std::string_view k, std::function<bool(View_[% table %]&)> cb, bool reverse = false, uint64_t startingPoint = 0, uint64_t *count = nullptr) {
+inline void foreachDup_[% table %]__[% indexName %](lmdb::txn &txn, std::string_view k, std::function<bool(View_[% table %]&)> cb, bool reverse = false, std::optional<uint64_t> startingPoint = std::nullopt, uint64_t *count = nullptr) {
     generic_foreach_index(txn, dbi_[% table %], dbi_[% table %]__[% indexName %], k, [&cb](uint64_t primaryKeyId, std::string_view v){
         View_[% table %] view(primaryKeyId, v);
         return cb(view);
-    }, reverse, startingPoint, count);
+    }, reverse, startingPoint ? *startingPoint : 0, count);
 }
 
 [% END %]
