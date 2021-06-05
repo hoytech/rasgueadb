@@ -150,7 +150,9 @@ To delete a record, you need its primary key, which you can retrieve from a view
 
 ## Unique
 
-A `unique` modifier can be specified on an index:
+By default, multiple records can have duplicate values for an indexed field, and in the index these duplicates are sorted by primary key.
+
+If you wish to prevent this, then a `unique` modifier can be specified on an index:
 
         fields:
           - name: userName
@@ -159,8 +161,6 @@ A `unique` modifier can be specified on an index:
               unique: true
 
 When you insert or update a record it will check that no other records have the same value for this index. If there are, then exception will be thrown.
-
-By default duplicates *are* allowed, and in the index these duplicates are sorted by primary key.
 
 
 ## Lookup by index
