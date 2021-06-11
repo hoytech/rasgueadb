@@ -8,9 +8,17 @@ inline void generic_foreach_raw(lmdb::txn &txn, lmdb::dbi &dbi, std::function<bo
     if (startingPoint) {
         k = lmdb::to_sv<uint64_t>(startingPoint);
 
-        if (!cursor.get(k, v, MDB_SET_RANGE)) return;
+        if (reverse) {
+            if (!cursor.get(k, v, MDB_SET_RANGE)) {
+                if (!cursor.get(k, v, MDB_LAST)) return;
+            } else {
+                if (lmdb::from_sv<uint64_t>(k) != startingPoint) cursor.get(k, v, MDB_PREV);
+            }
+        } else {
+            if (!cursor.get(k, v, MDB_SET_RANGE)) return;
+        }
 
-        if (reverse && lmdb::from_sv<uint64_t>(k) != startingPoint) cursor.get(k, v, MDB_PREV);
+        if (!cursor.get(k, v, MDB_SET_RANGE)) return;
     } else {
         if (!cursor.get(k, v, reverse ? MDB_LAST : MDB_FIRST)) return;
     }
@@ -36,12 +44,17 @@ inline void generic_foreach_index(lmdb::txn &txn, lmdb::dbi &tableDbi, lmdb::dbi
 
     if (startingPoint) {
         v = lmdb::to_sv<uint64_t>(startingPoint);
-        if (!cursorI.get(k, v, MDB_GET_BOTH_RANGE)) return;
 
-        uint64_t curr = lmdb::from_sv<uint64_t>(v);
-
-        if (reverse && curr > startingPoint) cursorI.get(k, v, MDB_PREV_DUP);
-        else if (!reverse && curr < startingPoint) cursorI.get(k, v, MDB_NEXT_DUP);
+        if (reverse) {
+            if (!cursorI.get(k, v, MDB_GET_BOTH_RANGE)) {
+                if (!cursorI.get(k, v, MDB_LAST_DUP)) return;
+            } else {
+                uint64_t curr = lmdb::from_sv<uint64_t>(v);
+                if (curr > startingPoint) cursorI.get(k, v, MDB_PREV_DUP);
+            }
+        } else {
+            if (!cursorI.get(k, v, MDB_GET_BOTH_RANGE)) return;
+        }
     } else {
         if (!cursorI.get(k, v, MDB_SET)) return;
 
