@@ -142,7 +142,7 @@ class environment {
 
     class View_OpLog;
 
-    inline void process_new_oplogs(lmdb::txn &txn, std::function<bool(uint64_t, View_OpLog &)> cb, uint64_t lastProcessedOpLogId, std::function<void()> onMissingOpLog) {
+    inline void process_new_oplogs(lmdb::txn &txn, std::function<bool(uint64_t, View_OpLog &)> cb, uint64_t lastProcessedOpLogId) {
         generic_foreach_raw(txn, dbi_OpLog, [&](std::string_view k, std::string_view v){
             uint64_t opLogId = lmdb::from_sv<uint64_t>(k);
             View_OpLog op(opLogId, v);
@@ -150,7 +150,7 @@ class environment {
             if (opLogId == lastProcessedOpLogId) return true; // already processed
 
             return cb(opLogId, op);
-        }, false, lastProcessedOpLogId, onMissingOpLog);
+        }, false, lastProcessedOpLogId);
     }
 
 

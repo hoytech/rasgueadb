@@ -1,16 +1,16 @@
 // Iteration methods
 
-inline void generic_foreach_raw(lmdb::txn &txn, lmdb::dbi &dbi, std::function<bool(std::string_view, std::string_view)> cb, bool reverse = false, uint64_t startingPoint = 0, std::function<void()> onStartingPointNotFound = [](){}) {
+inline void generic_foreach_raw(lmdb::txn &txn, lmdb::dbi &dbi, std::function<bool(std::string_view, std::string_view)> cb, bool reverse = false, uint64_t startingPoint = 0) {
     auto cursor = lmdb::cursor::open(txn, dbi);
 
     std::string_view k, v;
 
     if (startingPoint) {
         k = lmdb::to_sv<uint64_t>(startingPoint);
-        if (!cursor.get(k, v, MDB_SET)) {
-            onStartingPointNotFound();
-            return;
-        }
+
+        if (!cursor.get(k, v, MDB_SET_RANGE)) return;
+
+        if (reverse && lmdb::from_sv<uint64_t>(k) != startingPoint) cursor.get(k, v, MDB_PREV);
     } else {
         if (!cursor.get(k, v, reverse ? MDB_LAST : MDB_FIRST)) return;
     }
