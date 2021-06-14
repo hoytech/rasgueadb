@@ -1,12 +1,12 @@
 #pragma once
 
-#include <sys/time.h>
-
 #include <functional>
 #include <string_view>
 #include <optional>
+#include <vector>
 
 #include "hoytech-cpp/hoytech/error.h"
+#include "hoytech-cpp/hoytech/time.h"
 #include "lmdbxx/lmdb++.h"
 #include "flatbuffers/flatbuffers.h"
 #include "flatbuffers/minireflect.h"
@@ -18,7 +18,6 @@ namespace [% db %] {
 
 
 
-// Utilities useful in schema.yaml, since non-integer accessors must return a string_view
 
 static inline std::string_view sv(const flatbuffers::Vector<uint8_t> *v) {
     return std::string_view(reinterpret_cast<const char*>(v->data()), v->size());
@@ -26,17 +25,6 @@ static inline std::string_view sv(const flatbuffers::Vector<uint8_t> *v) {
 
 static inline std::string_view sv(const flatbuffers::String *v) {
     return v->string_view();
-}
-
-
-static inline uint64_t curr_time_s() {
-    return ::time(nullptr);
-}
-
-static inline uint64_t curr_time_us() {
-    struct timeval tv;
-    gettimeofday(&tv, nullptr);
-    return (uint64_t)tv.tv_sec * 1000000 + tv.tv_usec;
 }
 
 
@@ -143,7 +131,7 @@ class environment {
     class View_OpLog;
 
     inline void process_new_oplogs(lmdb::txn &txn, std::function<bool(uint64_t, View_OpLog &)> cb, uint64_t lastProcessedOpLogId) {
-        generic_foreach_raw(txn, dbi_OpLog, [&](std::string_view k, std::string_view v){
+        generic_foreachRaw(txn, dbi_OpLog, [&](std::string_view k, std::string_view v){
             uint64_t opLogId = lmdb::from_sv<uint64_t>(k);
             View_OpLog op(opLogId, v);
 
