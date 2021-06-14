@@ -47,10 +47,12 @@ foreach my $tableName (keys %{ $schema->{tables} }) {
         $field->{index} = {} unless ref $field->{index} eq 'HASH';
 
         die "duplicate index definition for $tableName / $field->{name}" if $table->{indices}->{$field->{name}};
+        die "index from field cannot be multi: $field->{name}" if $field->{index}->{multi};
 
         my $newIndex = {
             %{ $field->{index} },
             accessor => "v." . $field->{name} . "()",
+            from_field => 1,
             integer => integerType($field->{type}),
         };
 
@@ -58,8 +60,10 @@ foreach my $tableName (keys %{ $schema->{tables} }) {
     }
 
     foreach my $indexName (keys %{ $table->{indices} }) {
+        $table->{indices}->{$indexName} = {} unless ref $table->{indices}->{$indexName} eq 'HASH';
         my $index = $table->{indices}->{$indexName};
         die "indices with multi and unique are not supported ($tableName.$indexName)" if $index->{multi} && $index->{unique};
+        $index->{accessor} = $indexName if !$index->{accessor};
     }
 }
 

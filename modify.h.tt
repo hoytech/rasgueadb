@@ -2,10 +2,28 @@
 
 [% FOREACH table IN tables.keys %]
 
-void _insertIndices_[% table %](lmdb::txn &txn, View_[% table %] &v) {
+[% BLOCK indexManagementPrefix %]
     (void)v;
 
+    [% FOREACH index IN tables.$table.indices.keys.sort() %]
+        [% indexDef = tables.$table.indices.$index %]
+        [% integer_index = indexDef.integer %]
+        [% multi_index = indexDef.multi %]
+
+        [% IF !indexDef.from_field %]
+            [% IF multi_index %]
+                std::vector<[% integer_index ? 'uint64_t' : 'std::string' %]> [% indexDef.accessor %];
+            [% ELSE %]
+                std::optional<[% integer_index ? 'uint64_t' : 'std::string' %]> [% indexDef.accessor %];
+            [% END %]
+        [% END %]
+    [% END %]
+
     [% tables.$table.indexPrelude %]
+[% END %]
+
+void _insertIndices_[% table %](lmdb::txn &txn, View_[% table %] &v) {
+    [% PROCESS indexManagementPrefix %]
 
     [% FOREACH index IN tables.$table.indices.keys.sort() %]
         [% indexDef = tables.$table.indices.$index %]
@@ -13,28 +31,27 @@ void _insertIndices_[% table %](lmdb::txn &txn, View_[% table %] &v) {
         [% multi_index = indexDef.multi %]
         {
             [% IF multi_index %]
-                std::vector<[% integer_index ? 'uint64_t' : 'std::string_view' %]> index_key = [% indexDef.accessor %];
-                for (auto &i : index_key) dbi_[% table %]__[% index %].put(txn, [% IF integer_index %]lmdb::to_sv<uint64_t>[% END %](i), lmdb::to_sv<uint64_t>(v.primaryKeyId));
+                for (auto &i : [% indexDef.accessor %]) dbi_[% table %]__[% index %].put(txn, [% IF integer_index %]lmdb::to_sv<uint64_t>[% END %](i), lmdb::to_sv<uint64_t>(v.primaryKeyId));
             [% ELSE %]
-                [% integer_index ? 'uint64_t' : 'std::string_view' %] index_key = [% indexDef.accessor %];
+                [% IF !indexDef.from_field %] if ([% indexDef.accessor %]) { [% END %]
+                auto indexAccessor_ = [% IF !indexDef.from_field %]*[% END %][% indexDef.accessor %];
 
                 [% IF indexDef.exists('unique') %]
                     std::string_view junk;
-                    if (dbi_[% table %]__[% index %].get(txn, [% IF integer_index %]lmdb::to_sv<uint64_t>[% END %](index_key), junk)) {
+                    if (dbi_[% table %]__[% index %].get(txn, [% IF integer_index %]lmdb::to_sv<uint64_t>[% END %](indexAccessor_), junk)) {
                         throw hoytech::error("unique constraint violated: ", "[% table %].[% index %]");
                     }
                 [% END %]
 
-                dbi_[% table %]__[% index %].put(txn, [% IF integer_index %]lmdb::to_sv<uint64_t>[% END %](index_key), lmdb::to_sv<uint64_t>(v.primaryKeyId));
+                dbi_[% table %]__[% index %].put(txn, [% IF integer_index %]lmdb::to_sv<uint64_t>[% END %](indexAccessor_), lmdb::to_sv<uint64_t>(v.primaryKeyId));
+                [% IF !indexDef.from_field %] } [% END %]
             [% END %]
         }
     [% END %]
 }
 
 void _deleteIndices_[% table %](lmdb::txn &txn, View_[% table %] &v) {
-    (void)v;
-
-    [% tables.$table.indexPrelude %]
+    [% PROCESS indexManagementPrefix %]
 
     [% FOREACH index IN tables.$table.indices.keys.sort() %]
         [% indexDef = tables.$table.indices.$index %]
@@ -42,11 +59,10 @@ void _deleteIndices_[% table %](lmdb::txn &txn, View_[% table %] &v) {
         [% multi_index = indexDef.multi %]
     {
         [% IF multi_index %]
-            std::vector<[% integer_index ? 'uint64_t' : 'std::string_view' %]> index_key = [% indexDef.accessor %];
-            for (auto &i : index_key) dbi_[% table %]__[% index %].del(txn, [% IF integer_index %]lmdb::to_sv<uint64_t>[% END %](i), lmdb::to_sv<uint64_t>(v.primaryKeyId));
+            for (auto &i : [% indexDef.accessor %]) dbi_[% table %]__[% index %].del(txn, [% IF integer_index %]lmdb::to_sv<uint64_t>[% END %](i), lmdb::to_sv<uint64_t>(v.primaryKeyId));
         [% ELSE %]
-            [% integer_index ? 'uint64_t' : 'std::string_view' %] index_key = [% indexDef.accessor %];
-            dbi_[% table %]__[% index %].del(txn, [% IF integer_index %]lmdb::to_sv<uint64_t>[% END %](index_key), lmdb::to_sv<uint64_t>(v.primaryKeyId));
+            auto indexAccessor_ = [% IF !indexDef.from_field %]*[% END %][% indexDef.accessor %];
+            dbi_[% table %]__[% index %].del(txn, [% IF integer_index %]lmdb::to_sv<uint64_t>[% END %](indexAccessor_), lmdb::to_sv<uint64_t>(v.primaryKeyId));
         [% END %]
     }
     [% END %]
