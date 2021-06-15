@@ -20,7 +20,8 @@ Here is a simple example schema:
         fields:
           - name: userName
             type: string
-            unique: true
+            index:
+              unique: true
           - name: passwordHash
             type: ubytes
           - name: created
