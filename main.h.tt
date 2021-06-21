@@ -14,6 +14,9 @@
 #include "[% db %].schema_generated.h"
 
 
+[% includes %]
+
+
 namespace [% db %] {
 
 
@@ -36,6 +39,9 @@ class environment {
     environment &operator=(environment const &) = delete;
     environment(environment &&) = delete;
     environment &operator=(environment &&) = delete;
+
+
+    [% env.vars %]
 
 
     // Table definitions
@@ -72,6 +78,10 @@ class environment {
             dbi_[% table %]__[% index %] = lmdb::dbi::open(txn, "rasgueadb_[% db %]__[% table %]__[% index %]", MDB_CREATE | MDB_DUPSORT | MDB_INTEGERDUP [% IF tables.$table.indices.$index.integer %]| MDB_INTEGERKEY[% END %]);
           [% END %]
         [% END %]
+
+        {
+            [% env.setup %]
+        }
 
         txn.commit();
     }
