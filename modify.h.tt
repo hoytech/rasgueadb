@@ -10,12 +10,11 @@
         [% integer_index = indexDef.integer %]
         [% multi_index = indexDef.multi %]
 
-        [% IF !indexDef.from_field %]
-            [% IF multi_index %]
-                std::vector<[% integer_index ? 'uint64_t' : 'std::string' %]> [% indexDef.accessor %];
-            [% ELSE %]
-                std::optional<[% integer_index ? 'uint64_t' : 'std::string' %]> [% indexDef.accessor %];
-            [% END %]
+        [% IF multi_index %]
+            std::vector<[% integer_index ? 'uint64_t' : 'std::string' %]> [% indexDef.accessor %];
+        [% ELSE %]
+            std::optional<[% integer_index ? 'uint64_t' : 'std::string' %]> [% indexDef.accessor -%]
+                [%- IF indexDef.from_field %] = [% !integer_index ? 'std::string' : '' %](v.[% indexDef.accessor %]())[% END %];
         [% END %]
     [% END %]
 
@@ -33,18 +32,18 @@ void _insertIndices_[% table %](lmdb::txn &txn, View_[% table %] &v) {
             [% IF multi_index %]
                 for (auto &i : [% indexDef.accessor %]) dbi_[% table %]__[% index %].put(txn, [% IF integer_index %]lmdb::to_sv<uint64_t>[% END %](i), lmdb::to_sv<uint64_t>(v.primaryKeyId));
             [% ELSE %]
-                [% IF !indexDef.from_field %] if ([% indexDef.accessor %]) { [% END %]
-                auto indexAccessor_ = [% IF !indexDef.from_field %]*[% END %][% indexDef.accessor %];
+                if ([% indexDef.accessor %]) {
+                    auto &indexAccessor_ = *[% indexDef.accessor %];
 
-                [% IF indexDef.exists('unique') %]
-                    std::string_view junk;
-                    if (dbi_[% table %]__[% index %].get(txn, [% IF integer_index %]lmdb::to_sv<uint64_t>[% END %](indexAccessor_), junk)) {
-                        throw hoytech::error("unique constraint violated: ", "[% table %].[% index %]");
-                    }
-                [% END %]
+                    [% IF indexDef.exists('unique') %]
+                        std::string_view junk;
+                        if (dbi_[% table %]__[% index %].get(txn, [% IF integer_index %]lmdb::to_sv<uint64_t>[% END %](indexAccessor_), junk)) {
+                            throw hoytech::error("unique constraint violated: ", "[% table %].[% index %]");
+                        }
+                    [% END %]
 
-                dbi_[% table %]__[% index %].put(txn, [% IF integer_index %]lmdb::to_sv<uint64_t>[% END %](indexAccessor_), lmdb::to_sv<uint64_t>(v.primaryKeyId));
-                [% IF !indexDef.from_field %] } [% END %]
+                    dbi_[% table %]__[% index %].put(txn, [% IF integer_index %]lmdb::to_sv<uint64_t>[% END %](indexAccessor_), lmdb::to_sv<uint64_t>(v.primaryKeyId));
+                }
             [% END %]
         }
     [% END %]
@@ -61,7 +60,7 @@ void _deleteIndices_[% table %](lmdb::txn &txn, View_[% table %] &v) {
         [% IF multi_index %]
             for (auto &i : [% indexDef.accessor %]) dbi_[% table %]__[% index %].del(txn, [% IF integer_index %]lmdb::to_sv<uint64_t>[% END %](i), lmdb::to_sv<uint64_t>(v.primaryKeyId));
         [% ELSE %]
-            auto indexAccessor_ = [% IF !indexDef.from_field %]*[% END %][% indexDef.accessor %];
+            auto &indexAccessor_ = *[% indexDef.accessor %];
             dbi_[% table %]__[% index %].del(txn, [% IF integer_index %]lmdb::to_sv<uint64_t>[% END %](indexAccessor_), lmdb::to_sv<uint64_t>(v.primaryKeyId));
         [% END %]
     }

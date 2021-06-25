@@ -247,7 +247,7 @@ The `count` parameter is useful for implementing pagination. When retrieving the
 
 ## Derived indices
 
-Although you can make a particular field indexed by adding an `index` key to the field, you can also have indices that don't directly correspond to fields. The indexed values can be created with arbitrary C++ code by including an `indexPrelude` and then a set of `indices` to add. The `accessor`s in the indices should correspond to local variables you defined in the `indexPrelude`.
+Although you can make a particular field indexed by adding an `index` key to the field, you can also have indices that don't directly correspond to fields. The indexed values can be created with arbitrary C++ code by including an `indexPrelude` and then a set of `indices` to add.
 
 As an example, here is definition of a table that maintains indices of its two fields in lower-case:
 
@@ -261,16 +261,14 @@ As an example, here is definition of a table that maintains indices of its two f
             type: string
 
         indexPrelude: |
-          std::string fullNameLC = std::string(v.fullName());
-          std::string emailLC = std::string(v.email());
+          fullNameLC = std::string(v.fullName());
+          emailLC = std::string(v.email());
           std::transform(fullNameLC.begin(), fullNameLC.end(), fullNameLC.begin(), ::tolower);
           std::transform(emailLC.begin(), emailLC.end(), emailLC.begin(), ::tolower);
 
         indices:
-          fullNameLC:
-            accessor: 'fullNameLC'
+          fullNameLC: true
           emailLC:
-            accessor: 'emailLC'
             unique: true
 
 Now records can be queried using the index without worrying about casing, but the original user's chosen casing is preserved.
@@ -285,8 +283,6 @@ IMPORTANT: When deriving index values, given the same view (accessible as `v`) y
 A `multi` modifier can also be added to an index definition. This is for when a record should get multiple entries in the same index.
 
 The test-suite has an example where a `words` field is split up into individual words and each is added to a multi-index. This way you can query for all records that contain a particular word somewhere in their `words` field.
-
-For multi-indices, the variable referred to by `accessor` should be of type `std::vector<>`.
 
 
 
