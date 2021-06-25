@@ -114,6 +114,8 @@ uint64_t insert_[% table %](lmdb::txn &txn,
             [% END %]
         ) return 0; // NOTE: special return value of 0 indicates no update was done
 
+         _deleteIndices_[% table %](txn, *prev);
+
         dbi_[% table %].put(txn, lmdb::to_sv<uint64_t>(primaryKeyId), buf);
     } else {
         [% IF tables.$table.primaryKey %]
@@ -126,8 +128,6 @@ uint64_t insert_[% table %](lmdb::txn &txn,
         if (!inserted) throw hoytech::error("duplicate insert into [% table %]");
     }
 
-
-    if (prev) _deleteIndices_[% table %](txn, *prev);
 
     {
         View_[% table %] v(primaryKeyId, buf);
