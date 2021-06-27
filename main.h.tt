@@ -21,17 +21,6 @@ namespace [% db %] {
 
 
 
-
-static inline std::string_view sv(const flatbuffers::Vector<uint8_t> *v) {
-    return std::string_view(reinterpret_cast<const char*>(v->data()), v->size());
-}
-
-static inline std::string_view sv(const flatbuffers::String *v) {
-    return v->string_view();
-}
-
-
-
 class environment {
   public:
     environment() {}

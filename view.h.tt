@@ -9,8 +9,11 @@ class View_[% table %] {
     [% FOREACH field IN tables.$table.fields %]
       [% utils.type_to_cpp(field.type) %] [% field.name %]() {
         auto p = v->[% field.name %]();
-        [% IF field.type == "ubytes" || field.type == "string" %]
-            return p ? sv(p) : "";
+
+        [% IF field.type == "string" %]
+            return p ? p->string_view() : "";
+        [% ELSIF field.type == "ubytes" %]
+            return p ? std::string_view(reinterpret_cast<const char*>(p->data()), p->size()) : "";
         [% ELSE %]
             return p;
         [% END %]
