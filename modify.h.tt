@@ -134,7 +134,7 @@ uint64_t insert_[% table %](lmdb::txn &txn,
     }
 
 
-    [% IF !tables.$table.noOplog %]
+    [% IF opLog && !tables.$table.noOplog %]
         insert_OpLog(txn, prev ? 1 : 0, [% tables.$table.tableId %], primaryKeyId, hoytech::curr_time_us());
     [% END %]
 
@@ -176,7 +176,9 @@ void delete_[% table %](lmdb::txn &txn, uint64_t primaryKeyId, bool allowNop = t
 
     dbi_[% table %].del(txn, lmdb::to_sv<uint64_t>(primaryKeyId));
 
-    insert_OpLog(txn, 2, [% tables.$table.tableId %], primaryKeyId, hoytech::curr_time_us());
+    [% IF opLog && !tables.$table.noOplog %]
+        insert_OpLog(txn, 2, [% tables.$table.tableId %], primaryKeyId, hoytech::curr_time_us());
+    [% END %]
 }
 
 

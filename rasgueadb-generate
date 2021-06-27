@@ -69,26 +69,27 @@ foreach my $tableName (keys %{ $schema->{tables} }) {
 
 ## Add internal tables
 
-$schema->{tables}->{OpLog} = {
-    tableId => 1_000_000,
-    noOplog => 1,
-    fields => [
-        {
-            name => 'opType',
-            type => 'uint8',  # 0=insert  1=update  2=delete
-        },
-        {
-            name => 'tableId',
-        },
-        {
-            name => 'recordId',
-        },
-        {
-            name => 'timestamp',
-        },
-    ],
-};
-
+if ($schema->{opLog}) {
+    $schema->{tables}->{OpLog} = {
+        tableId => 1_000_000,
+        noOplog => 1,
+        fields => [
+            {
+                name => 'opType',
+                type => 'uint8',  # 0=insert  1=update  2=delete
+            },
+            {
+                name => 'tableId',
+            },
+            {
+                name => 'recordId',
+            },
+            {
+                name => 'timestamp',
+            },
+        ],
+    };
+}
 
 
 
