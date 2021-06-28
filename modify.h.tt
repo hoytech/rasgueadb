@@ -13,8 +13,18 @@
         [% IF multi_index %]
             std::vector<[% integer_index ? 'uint64_t' : 'std::string' %]> [% indexDef.accessor %];
         [% ELSE %]
-            std::optional<[% integer_index ? 'uint64_t' : 'std::string' %]> [% indexDef.accessor -%]
-                [%- IF indexDef.from_field %] = [% !integer_index ? 'std::string' : '' %](v.[% indexDef.accessor %]())[% END %];
+            std::optional<[% integer_index ? 'uint64_t' : 'std::string' %]> [% indexDef.accessor -%];
+
+            [% IF indexDef.from_field %]
+                {
+                    auto temp = v.[% indexDef.accessor %]();
+                    [% IF integer_index %]
+                        if (temp) [% indexDef.accessor %] = v.[% indexDef.accessor %]();
+                    [% ELSE %]
+                        if (temp.size()) [% indexDef.accessor %] = std::string(v.[% indexDef.accessor %]());
+                    [% END %]
+                }
+            [% END %]
         [% END %]
     [% END %]
 
@@ -60,8 +70,10 @@ void _deleteIndices_[% table %](lmdb::txn &txn, View_[% table %] &v) {
         [% IF multi_index %]
             for (auto &i : [% indexDef.accessor %]) dbi_[% table %]__[% index %].del(txn, [% IF integer_index %]lmdb::to_sv<uint64_t>[% END %](i), lmdb::to_sv<uint64_t>(v.primaryKeyId));
         [% ELSE %]
-            auto &indexAccessor_ = *[% indexDef.accessor %];
-            dbi_[% table %]__[% index %].del(txn, [% IF integer_index %]lmdb::to_sv<uint64_t>[% END %](indexAccessor_), lmdb::to_sv<uint64_t>(v.primaryKeyId));
+            if ([% indexDef.accessor %]) {
+                auto &indexAccessor_ = *[% indexDef.accessor %];
+                dbi_[% table %]__[% index %].del(txn, [% IF integer_index %]lmdb::to_sv<uint64_t>[% END %](indexAccessor_), lmdb::to_sv<uint64_t>(v.primaryKeyId));
+            }
         [% END %]
     }
     [% END %]
@@ -106,12 +118,8 @@ uint64_t insert_[% table %](lmdb::txn &txn,
         primaryKeyId = prev->primaryKeyId;
 
         // If all parameters are the same, update is a no-op
-        if (
-            [% FOREACH field IN tables.$table.fields %]
-                param__[% field.name %] == prev->[% field.name %]()
-                [% IF !loop.last() %]&&[% END %]
-            [% END %]
-        ) return 0; // NOTE: special return value of 0 indicates no update was done
+        // NOTE: special return value of 0 indicates no update was done
+        if (buf == prev->buf) return 0;
 
          _deleteIndices_[% table %](txn, *prev);
 
@@ -149,8 +157,8 @@ struct Updates_[% table %] {
   [% END %]
 };
 
-void update_[% table %](lmdb::txn &txn, View_[% table %] prev, Updates_[% table %] upd) {
-    insert_[% table %](txn, [% FOREACH field IN tables.$table.fields %]upd.[% field.name %] ? *upd.[% field.name %] : prev.[% field.name %](), [% END %]prev);
+uint64_t update_[% table %](lmdb::txn &txn, View_[% table %] prev, Updates_[% table %] upd) {
+    return insert_[% table %](txn, [% FOREACH field IN tables.$table.fields %]upd.[% field.name %] ? *upd.[% field.name %] : prev.[% field.name %](), [% END %]prev);
 }
 
 

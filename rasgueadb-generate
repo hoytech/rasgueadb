@@ -43,6 +43,8 @@ foreach my $tableName (keys %{ $schema->{tables} }) {
     my $table = $schema->{tables}->{$tableName};
 
     foreach my $field (@{ $table->{fields} }) {
+        die "field name cannot contain __" if $field->{name} =~ /__/;
+
         next if !$field->{index};
         $field->{index} = {} unless ref $field->{index} eq 'HASH';
 
