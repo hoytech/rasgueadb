@@ -12,6 +12,15 @@
 
         [% IF multi_index %]
             std::vector<[% integer_index ? 'uint64_t' : 'std::string' %]> [% indexDef.accessor %];
+            [% IF indexDef.from_field %]
+                for (auto &f : v.[% indexDef.accessor %]()) {
+                    [% IF integer_index %]
+                        [% indexDef.accessor %].push_back(f);
+                    [% ELSE %]
+                        [% indexDef.accessor %].push_back(std::string(f));
+                    [% END %]
+                }
+            [% END %]
         [% ELSE %]
             std::optional<[% integer_index ? 'uint64_t' : 'std::string' %]> [% indexDef.accessor -%];
 
@@ -94,12 +103,20 @@ uint64_t insert_[% table %](lmdb::txn &txn,
             auto builder_ptr__[% field.name %] = builder.CreateString(param__[% field.name %]);
           [% ELSIF field.type == "ubytes" %]
             auto builder_ptr__[% field.name %] = builder.CreateVector((uint8_t*)(param__[% field.name %].data()), param__[% field.name %].size());
+          [% ELSIF field.type == "string[]" || field.type == "ubytes[]" %]
+            auto builder_ptr__[% field.name %] = builder.CreateVector([&]{
+                std::vector<flatbuffers::Offset<flatbuffers::String>> vec;
+                for (auto &p : param__[% field.name %]) vec.push_back(builder.CreateString(p));
+                return vec;
+            }());
+          [% ELSIF field.type == "uint64[]" %]
+            auto builder_ptr__[% field.name %] = builder.CreateVector((uint64_t*)(param__[% field.name %].data()), param__[% field.name %].size());
           [% END %]
         [% END %]
 
         [% db %]::[% table %]Builder mb(builder);
         [% FOREACH field IN tables.$table.fields %]
-          [% IF field.type == "string" || field.type == "ubytes" %]
+          [% IF field.type == "string" || field.type == "ubytes" || field.type == "string[]" || field.type == "ubytes[]" || field.type == "uint64[]" %]
             mb.add_[% field.name %](builder_ptr__[% field.name %]);
           [% ELSE %]
             mb.add_[% field.name %](param__[% field.name %]);

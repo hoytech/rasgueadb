@@ -121,6 +121,17 @@ class environment {
     }
 
 
+
+    // Misc utilities
+
+    std::vector<std::string_view> views(const std::vector<std::string> &inp) {
+        std::vector<std::string_view> output;
+        for (auto &i : inp) output.push_back(i);
+        return output;
+    }
+
+
+
     [% IF opLog %]
         // OpLog stuff
 

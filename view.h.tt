@@ -10,10 +10,24 @@ class View_[% table %] {
       [% utils.type_to_cpp(field.type) %] [% field.name %]() {
         auto p = v->[% field.name %]();
 
-        [% IF field.type == "string" %]
-            return p ? p->string_view() : "";
-        [% ELSIF field.type == "ubytes" %]
+        [% IF field.type == "string" || field.type == "ubytes" %]
             return p ? std::string_view(reinterpret_cast<const char*>(p->data()), p->size()) : "";
+        [% ELSIF field.type == "string[]" || field.type == "ubytes[]" %]
+            std::vector<std::string_view> output;
+            if (p) {
+                for (auto item : *p) {
+                    output.push_back(item->string_view());
+                }
+            }
+            return output;
+        [% ELSIF field.type == "uint64[]" %]
+            std::vector<uint64_t> output;
+            if (p) {
+                for (auto item : *p) {
+                    output.push_back(item);
+                }
+            }
+            return output;
         [% ELSE %]
             return p;
         [% END %]

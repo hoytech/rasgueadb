@@ -56,7 +56,9 @@ foreach my $tableName (keys %{ $schema->{tables} }) {
             accessor => $field->{name},
             from_field => 1,
             integer => integerType($field->{type}),
+            multi => !!($field->{type} =~ /\[\]$/),
         };
+
 
         $table->{indices}->{$field->{name}} = $newIndex;
     }
@@ -113,13 +115,18 @@ $schema->{utils} = {
         my $type = shift;
         return "uint64" if !defined $type || $type eq '';
         return "[ubyte]" if $type eq 'ubytes';
+        return "[string]" if $type eq 'ubytes[]' || $type eq 'string[]';
+        return "[uint64]" if $type eq 'uint64[]';
         return $type;
     },
 
     type_to_cpp => sub {
         my $type = shift;
+        my $insertion = shift;
         return "uint64_t" if !defined $type || $type eq '';
         return "${type}_t" if $type =~ /^u?int\d+$/;
+        return "std::vector<std::string_view>" if $type eq 'ubytes[]' || $type eq 'string[]';
+        return "std::vector<uint64_t>" if $type eq 'uint64[]';
         return "std::string_view";
     },
 
@@ -157,7 +164,7 @@ sub integerType {
     my $type = shift;
 
     return 1 if !defined $type;
-    return 1 if $type =~ /^u?int\d+$/;
+    return 1 if $type =~ /^u?int\d+(\[\]|)$/;
 
     return undef;
 }
