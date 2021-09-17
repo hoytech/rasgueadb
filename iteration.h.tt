@@ -92,6 +92,7 @@ inline void generic_foreachDup(lmdb::txn &txn, lmdb::dbi &tableDbi, lmdb::dbi &i
 
         if (reverse) {
             if (!cursorI.get(k, v, MDB_GET_BOTH_RANGE)) {
+                if (!cursorI.get(k, v, MDB_SET)) return;
                 if (!cursorI.get(k, v, MDB_LAST_DUP)) return;
             } else {
                 uint64_t curr = lmdb::from_sv<uint64_t>(v);
