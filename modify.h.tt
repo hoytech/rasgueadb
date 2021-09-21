@@ -207,4 +207,36 @@ void delete_[% table %](lmdb::txn &txn, uint64_t primaryKeyId, bool allowNop = t
 }
 
 
+
+struct Indices_[% table %] {
+    [% FOREACH index IN tables.$table.indices.keys.sort() %]
+        [% indexDef = tables.$table.indices.$index %]
+        [% integer_index = indexDef.integer %]
+        [% multi_index = indexDef.multi %]
+
+        [% IF multi_index %]
+            std::vector<[% integer_index ? 'uint64_t' : 'std::string' %]> [% indexDef.accessor %];
+        [% ELSE %]
+            std::optional<[% integer_index ? 'uint64_t' : 'std::string' %]> [% indexDef.accessor -%];
+        [% END %]
+    [% END %]
+};
+
+struct Indices_[% table %] getIndices_[% table %](View_[% table %] &v) {
+    [% PROCESS indexManagementPrefix %]
+
+    struct Indices_[% table %] _output;
+
+    [% FOREACH index IN tables.$table.indices.keys.sort() %]
+        [% indexDef = tables.$table.indices.$index %]
+        [% integer_index = indexDef.integer %]
+        [% multi_index = indexDef.multi %]
+
+        _output.[% index %] = std::move([% index %]);
+    [% END %]
+
+    return _output;
+}
+
+
 [% END %]
