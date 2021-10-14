@@ -140,7 +140,13 @@ $schema->{utils} = {
         my $indexDef = shift;
         return "lmdb::to_sv<uint64_t>" if $indexDef->{integer};
         return "";
-    }
+    },
+
+    index_conversion_rev => sub {
+        my $indexDef = shift;
+        return "lmdb::from_sv<uint64_t>" if $indexDef->{integer};
+        return "";
+    },
 };
 
 my $fbsFile = "$outputDir/$schema->{db}.schema.fbs";

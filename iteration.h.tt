@@ -1,6 +1,6 @@
 // Iteration methods
 
-inline void generic_foreachRaw(lmdb::txn &txn, lmdb::dbi &dbi, std::function<bool(std::string_view, std::string_view)> cb, bool reverse = false, uint64_t startingPoint = 0) {
+inline void generic_foreachRaw(lmdb::txn &txn, lmdb::dbi &dbi, std::function<bool(std::string_view, std::string_view)> cb, bool reverse = false, uint64_t startingPoint = 0, bool skipDups = false) {
     auto cursor = lmdb::cursor::open(txn, dbi);
 
     std::string_view k, v;
@@ -23,9 +23,17 @@ inline void generic_foreachRaw(lmdb::txn &txn, lmdb::dbi &dbi, std::function<boo
         if (!cursor.get(k, v, reverse ? MDB_LAST : MDB_FIRST)) return;
     }
 
+    MDB_cursor_op traversal;
+
+    if (reverse) {
+        traversal = skipDups ? MDB_PREV_NODUP : MDB_PREV;
+    } else {
+        traversal = skipDups ? MDB_NEXT_NODUP : MDB_NEXT;
+    }
+
     do {
         if (!cb(k, v)) return;
-    } while (cursor.get(k, v, reverse ? MDB_PREV : MDB_NEXT));
+    } while (cursor.get(k, v, traversal));
 }
 
 
@@ -76,7 +84,6 @@ inline void generic_foreachByIndex(lmdb::txn &txn, lmdb::dbi &tableDbi, lmdb::db
         }
     } while (cursorI.get(k, v, reverse ? (indexKey ? MDB_PREV_DUP : MDB_PREV) : (indexKey ? MDB_NEXT_DUP : MDB_NEXT)));
 }
-
 
 
 inline void generic_foreachDup(lmdb::txn &txn, lmdb::dbi &tableDbi, lmdb::dbi &indexDbi, std::string_view k, std::function<bool(uint64_t, std::string_view)> cb, bool reverse = false, uint64_t startingPoint = 0, uint64_t *count = nullptr, bool allow_dangling = false) {
@@ -154,6 +161,10 @@ inline void foreachDup_[% table %]__[% indexName %](lmdb::txn &txn, [% utils.ind
         View_[% table %] view(primaryKeyId, v);
         return cb(view);
     }, reverse, startingPoint ? *startingPoint : 0, count);
+}
+
+inline void foreachKey_[% table %]__[% indexName %](lmdb::txn &txn, std::function<bool([% utils.index_name_to_type(indexDef) %] k)> cb, bool reverse = false) {
+    generic_foreachRaw(txn, dbi_[% table %]__[% indexName %], [&cb](std::string_view k, std::string_view){ return cb([% utils.index_conversion_rev(indexDef) %](k)); }, reverse, 0, true);
 }
 
 [% END %]
