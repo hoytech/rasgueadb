@@ -24,6 +24,8 @@ my $schema = YAML::LoadFile($schemaFile);
 ## Sanity checking
 
 {
+    $schema->{db} ||= 'defaultDb';
+
     die "db name can't include '__': $schema->{db}" if $schema->{db} =~ /__/;
 
     my $tableIds = {};
