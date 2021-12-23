@@ -28,9 +28,10 @@
                 {
                     auto temp = v.[% indexDef.accessor %]();
                     [% IF integer_index %]
-                        if (temp) [% indexDef.accessor %] = v.[% indexDef.accessor %]();
+                        [% IF !indexDef.includeZero %]if (temp)[% END %] [% indexDef.accessor %] = temp;
                     [% ELSE %]
-                        if (temp.size()) [% indexDef.accessor %] = std::string(v.[% indexDef.accessor %]());
+                        [% IF indexDef.includeZero %]#error Non-integer indices cannot have includeZero[% END %]
+                        if (temp.size()) [% indexDef.accessor %] = std::string(temp);
                     [% END %]
                 }
             [% END %]
