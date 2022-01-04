@@ -149,7 +149,7 @@ class environment {
                 if (opLogId == lastProcessedOpLogId) return true; // already processed
 
                 return cb(opLogId, op);
-            }, false, lastProcessedOpLogId);
+            }, false, lmdb::to_sv<uint64_t>(lastProcessedOpLogId));
         }
     [% END %]
 

@@ -1,18 +1,18 @@
 // Iteration methods
 
-inline void generic_foreachRaw(lmdb::txn &txn, lmdb::dbi &dbi, std::function<bool(std::string_view, std::string_view)> cb, bool reverse = false, uint64_t startingPoint = 0, bool skipDups = false) {
+inline void generic_foreachRaw(lmdb::txn &txn, lmdb::dbi &dbi, std::function<bool(std::string_view, std::string_view)> cb, bool reverse = false, std::optional<std::string_view> startingPoint = std::nullopt, bool skipDups = false) {
     auto cursor = lmdb::cursor::open(txn, dbi);
 
     std::string_view k, v;
 
     if (startingPoint) {
-        k = lmdb::to_sv<uint64_t>(startingPoint);
+        k = *startingPoint;
 
         if (reverse) {
             if (!cursor.get(k, v, MDB_SET_RANGE)) {
                 if (!cursor.get(k, v, MDB_LAST)) return;
             } else {
-                if (lmdb::from_sv<uint64_t>(k) != startingPoint) cursor.get(k, v, MDB_PREV);
+                if (k != *startingPoint) cursor.get(k, v, MDB_PREV);
             }
         } else {
             if (!cursor.get(k, v, MDB_SET_RANGE)) return;
@@ -38,7 +38,7 @@ inline void generic_foreachRaw(lmdb::txn &txn, lmdb::dbi &dbi, std::function<boo
 
 
 inline void generic_foreach(lmdb::txn &txn, lmdb::dbi &dbi, std::function<bool(uint64_t, std::string_view)> cb, bool reverse = false, uint64_t startingPoint = 0) {
-    generic_foreachRaw(txn, dbi, [&cb](std::string_view k, std::string_view v){ return cb(lmdb::from_sv<uint64_t>(k), v); }, reverse, startingPoint);
+    generic_foreachRaw(txn, dbi, [&cb](std::string_view k, std::string_view v){ return cb(lmdb::from_sv<uint64_t>(k), v); }, reverse, startingPoint ? std::optional<std::string_view>(lmdb::to_sv<uint64_t>(startingPoint)) : std::nullopt);
 }
 
 
@@ -163,8 +163,8 @@ inline void foreachDup_[% table %]__[% indexName %](lmdb::txn &txn, [% utils.ind
     }, reverse, startingPoint ? *startingPoint : 0, count);
 }
 
-inline void foreachKey_[% table %]__[% indexName %](lmdb::txn &txn, std::function<bool([% utils.index_name_to_type(indexDef) %] k)> cb, bool reverse = false) {
-    generic_foreachRaw(txn, dbi_[% table %]__[% indexName %], [&cb](std::string_view k, std::string_view){ return cb([% utils.index_conversion_rev(indexDef) %](k)); }, reverse, 0, true);
+inline void foreachKey_[% table %]__[% indexName %](lmdb::txn &txn, std::function<bool([% utils.index_name_to_type(indexDef) %] k)> cb, bool reverse = false, std::optional<std::string_view> startKey = std::nullopt) {
+    generic_foreachRaw(txn, dbi_[% table %]__[% indexName %], [&cb](std::string_view k, std::string_view){ return cb([% utils.index_conversion_rev(indexDef) %](k)); }, reverse, startKey, true);
 }
 
 [% END %]
