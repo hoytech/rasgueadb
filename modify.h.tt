@@ -208,6 +208,22 @@ void delete_[% table %](lmdb::txn &txn, uint64_t primaryKeyId, bool allowNop = t
 }
 
 
+void reIndex_[% table %](lmdb::txn &txn, uint64_t primaryKeyId) {
+    std::string_view buf;
+
+    bool found = dbi_[% table %].get(txn, lmdb::to_sv<uint64_t>(primaryKeyId), buf);
+    if (!found) {
+        throw hoytech::error("unable to find [% table %] record to reindex");
+    }
+
+    {
+        View_[% table %] v(primaryKeyId, buf);
+        _deleteIndices_[% table %](txn, v);
+        _insertIndices_[% table %](txn, v);
+    }
+}
+
+
 
 struct Indices_[% table %] {
     [% FOREACH index IN tables.$table.indices.keys.sort() %]
