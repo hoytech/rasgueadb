@@ -30,6 +30,7 @@ class environment {
     environment &operator=(environment &&) = delete;
 
 
+    bool envInited = false;
     [% env.vars %]
 
 
@@ -44,12 +45,27 @@ class environment {
       [% END %]
     [% END %]
 
+    lmdb::dbi lookupDbi(std::string_view name) {
+        if (!envInited) throw hoytech::error("rasgueadb environment not yet opened");
+
+        [% FOREACH table IN tables.keys %]
+            if (name == "[% table %]") return dbi_[% table %];
+            [% FOREACH indexName IN tables.$table.indices.keys %]
+                if (name == "[% table %]__[% indexName %]") return dbi_[% table %]__[% indexName %];
+            [% END %]
+        [% END %]
+
+        throw hoytech::error("unknown table name: ", name);
+    }
+
 
     // Open and init environment
 
     lmdb::env lmdb_env = lmdb::env::create();
 
     void open(std::string dir) {
+        if (envInited) throw hoytech::error("rasgueadb environment already opened");
+
         lmdb_env.set_max_dbs(64);
         lmdb_env.set_mapsize(1UL * 1024UL * 1024UL * 1024UL * 1024UL);
 
@@ -73,6 +89,8 @@ class environment {
         }
 
         txn.commit();
+
+        envInited = true;
     }
 
     void copy_fd(int fd) { lmdb::env_copy_fd(lmdb_env, fd, MDB_CP_COMPACT); }
