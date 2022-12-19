@@ -18,6 +18,8 @@ my $schemaFile = shift || usage();
 my $outputDir = shift || usage();
 
 
+die "unable to find schema file $schemaFile" if !-e $schemaFile;
+
 my $schema = YAML::LoadFile($schemaFile);
 
 
