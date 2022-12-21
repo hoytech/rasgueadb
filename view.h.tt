@@ -32,6 +32,12 @@ class View_[% table %] {
             return p;
         [% END %]
       }
+
+      [% IF field.nestedFlat %]
+          const [% db %]::[% field.nestedFlat %] *[% field.name %]_nested() {
+              return v->[% field.name %]_nested_root();
+          }
+      [% END %]
     [% END %]
 
     std::string _str() {
