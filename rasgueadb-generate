@@ -47,6 +47,12 @@ foreach my $tableName (keys %{ $schema->{tables} }) {
     my $table = $schema->{tables}->{$tableName};
 
     foreach my $field (@{ $table->{fields} }) {
+        if ($field->{nestedFlat}) {
+            $field->{attributes} = qq{ (nested_flatbuffer: "$field->{nestedFlat}")};
+        }
+    }
+
+    foreach my $field (@{ $table->{fields} }) {
         die "field name cannot contain __" if $field->{name} =~ /__/;
 
         next if !$field->{index};
