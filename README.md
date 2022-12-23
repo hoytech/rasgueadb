@@ -284,6 +284,20 @@ A `multi` modifier can also be added to an index definition. This is for when a 
 
 The test-suite has an example where a `words` field is split up into individual words and each is added to a multi-index. This way you can query for all records that contain a particular word somewhere in their `words` field.
 
+In the `indexPrelude` for this table, the variable created with the index's name becomes an `std::vector`. You should push on as many items as you wish to index for this record. If you don't push anything, there will be 0 index entries created for this record.
+
+
+
+## AltOrder
+
+By default, iterating over items with the same index (for example with `env.foreachDup_TABLE__INDEX`) will iterate over the entries in primary key order (either ascending or descending according to the `reverse` parameter).
+
+Sometimes this is not what you want from an index. If you tag an index as `altOrder`, then the automatically created variable in the `indexPrelude` becomes a `std::vector<struct ...>`. The struct has two members: the primary (what you would normally index), and an alt, which is a `uint64_t`.
+
+For example, if you want to iterate over this index in order of a `created` timestamp, you might do this in the prelude:
+
+    myIndex.push_back({ std::string(v.myField()), v.created() });
+
 
 
 ## OpLog
@@ -298,5 +312,3 @@ A special table `OpLog` is automatically added to your schema. This is a record 
 RasgueaDB © 2021 Doug Hoyte.
 
 2-clause BSD license. See the LICENSE file.
-
-Does this stuff interest you? Subscribe for news on my upcoming book: [Zero Copy](https://leanpub.com/zerocopy)!

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <endian.h>
+
 #include <functional>
 #include <string_view>
 #include <optional>
@@ -20,6 +22,21 @@ inline std::string_view sv(const flatbuffers::Vector<unsigned char> *p) {
 
 inline std::string_view sv(const flatbuffers::String *p) {
     return p ? std::string_view(reinterpret_cast<const char*>(p->data()), p->size()) : "";
+}
+
+inline std::string genAltOrderVal(uint64_t alt, uint64_t primary) {
+    alt = htobe64(alt);
+    primary = htobe64(primary);
+    std::string o;
+    o += std::string_view(reinterpret_cast<const char*>(&alt), 8);
+    o += std::string_view(reinterpret_cast<const char*>(&primary), 8);
+    return o;
+}
+
+inline uint64_t extractAltOrderPrimary(std::string_view buf) {
+    if (buf.size() != 16) throw hoytech::error("unexpected altOrder size");
+    uint64_t output = *reinterpret_cast<const uint64_t*>(buf.substr(8).data());
+    return be64toh(output);
 }
 
 
@@ -89,7 +106,7 @@ class environment {
           dbi_[% table %] = lmdb::dbi::open(txn, "rasgueadb_[% db %]__[% table %]", MDB_CREATE | MDB_INTEGERKEY);
 
           [% FOREACH index IN tables.$table.indices.keys %]
-            dbi_[% table %]__[% index %] = lmdb::dbi::open(txn, "rasgueadb_[% db %]__[% table %]__[% index %]", MDB_CREATE | MDB_DUPSORT | MDB_INTEGERDUP [% IF tables.$table.indices.$index.integer %]| MDB_INTEGERKEY[% END %]);
+            dbi_[% table %]__[% index %] = lmdb::dbi::open(txn, "rasgueadb_[% db %]__[% table %]__[% index %]", MDB_CREATE | MDB_DUPSORT [% IF !tables.$table.indices.$index.altOrder %]| MDB_INTEGERDUP[% END %] [% IF tables.$table.indices.$index.integer %]| MDB_INTEGERKEY[% END %]);
           [% END %]
         [% END %]
 

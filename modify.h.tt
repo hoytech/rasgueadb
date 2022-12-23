@@ -2,6 +2,20 @@
 
 [% FOREACH table IN tables.keys %]
 
+[% FOREACH index IN tables.$table.indices.keys.sort() %]
+    [% indexDef = tables.$table.indices.$index %]
+    [% integer_index = indexDef.integer %]
+    [% multi_index = indexDef.multi %]
+    [% altOrder_index = indexDef.altOrder %]
+
+    [% IF altOrder_index %]
+        struct Composite__[% table %]__[% indexDef.accessor %] {
+            [% integer_index ? 'uint64_t' : 'std::string' %] primary;
+            uint64_t alt;
+        };
+    [% END %]
+[% END %]
+
 [% BLOCK indexManagementPrefix %]
     (void)v;
 
@@ -9,9 +23,13 @@
         [% indexDef = tables.$table.indices.$index %]
         [% integer_index = indexDef.integer %]
         [% multi_index = indexDef.multi %]
+        [% altOrder_index = indexDef.altOrder %]
 
-        [% IF multi_index %]
+        [% IF altOrder_index %]
+            std::vector<Composite__[% table %]__[% indexDef.accessor %]> [% indexDef.accessor %];
+        [% ELSIF multi_index %]
             std::vector<[% integer_index ? 'uint64_t' : 'std::string' %]> [% indexDef.accessor %];
+
             [% IF indexDef.from_field %]
                 for (auto &f : v.[% indexDef.accessor %]()) {
                     [% IF integer_index %]
@@ -48,9 +66,13 @@ void _insertIndices_[% table %](lmdb::txn &txn, View_[% table %] &v) {
         [% indexDef = tables.$table.indices.$index %]
         [% integer_index = indexDef.integer %]
         [% multi_index = indexDef.multi %]
+        [% altOrder_index = indexDef.altOrder %]
         {
             [% IF multi_index %]
-                for (auto &i : [% indexDef.accessor %]) dbi_[% table %]__[% index %].put(txn, [% IF integer_index %]lmdb::to_sv<uint64_t>[% END %](i), lmdb::to_sv<uint64_t>(v.primaryKeyId));
+                for (auto &i : [% indexDef.accessor %]) {
+                    [% IF altOrder_index %]std::string altOrderVal = genAltOrderVal(i.alt, v.primaryKeyId);[% END %]
+                    dbi_[% table %]__[% index %].put(txn, [% IF integer_index %]lmdb::to_sv<uint64_t>[% END %](i[% IF altOrder_index %].primary[% END %]), [% IF altOrder_index %]altOrderVal[% ELSE %]lmdb::to_sv<uint64_t>(v.primaryKeyId)[% END %]);
+                }
             [% ELSE %]
                 if ([% indexDef.accessor %]) {
                     auto &indexAccessor_ = *[% indexDef.accessor %];
@@ -76,16 +98,20 @@ void _deleteIndices_[% table %](lmdb::txn &txn, View_[% table %] &v) {
         [% indexDef = tables.$table.indices.$index %]
         [% integer_index = indexDef.integer %]
         [% multi_index = indexDef.multi %]
-    {
-        [% IF multi_index %]
-            for (auto &i : [% indexDef.accessor %]) dbi_[% table %]__[% index %].del(txn, [% IF integer_index %]lmdb::to_sv<uint64_t>[% END %](i), lmdb::to_sv<uint64_t>(v.primaryKeyId));
-        [% ELSE %]
-            if ([% indexDef.accessor %]) {
-                auto &indexAccessor_ = *[% indexDef.accessor %];
-                dbi_[% table %]__[% index %].del(txn, [% IF integer_index %]lmdb::to_sv<uint64_t>[% END %](indexAccessor_), lmdb::to_sv<uint64_t>(v.primaryKeyId));
-            }
-        [% END %]
-    }
+        [% altOrder_index = indexDef.altOrder %]
+        {
+            [% IF multi_index %]
+                for (auto &i : [% indexDef.accessor %]) {
+                    [% IF altOrder_index %]std::string altOrderVal = genAltOrderVal(i.alt, v.primaryKeyId);[% END %]
+                    dbi_[% table %]__[% index %].del(txn, [% IF integer_index %]lmdb::to_sv<uint64_t>[% END %](i[% IF altOrder_index %].primary[% END %]), [% IF altOrder_index %]altOrderVal[% ELSE %]lmdb::to_sv<uint64_t>(v.primaryKeyId)[% END %]);
+                }
+            [% ELSE %]
+                if ([% indexDef.accessor %]) {
+                    auto &indexAccessor_ = *[% indexDef.accessor %];
+                    dbi_[% table %]__[% index %].del(txn, [% IF integer_index %]lmdb::to_sv<uint64_t>[% END %](indexAccessor_), lmdb::to_sv<uint64_t>(v.primaryKeyId));
+                }
+            [% END %]
+        }
     [% END %]
 }
 
@@ -230,8 +256,11 @@ struct Indices_[% table %] {
         [% indexDef = tables.$table.indices.$index %]
         [% integer_index = indexDef.integer %]
         [% multi_index = indexDef.multi %]
+        [% altOrder_index = indexDef.altOrder %]
 
-        [% IF multi_index %]
+        [% IF altOrder_index %]
+            std::vector<Composite__[% table %]__[% indexDef.accessor %]> [% indexDef.accessor %];
+        [% ELSIF multi_index %]
             std::vector<[% integer_index ? 'uint64_t' : 'std::string' %]> [% indexDef.accessor %];
         [% ELSE %]
             std::optional<[% integer_index ? 'uint64_t' : 'std::string' %]> [% indexDef.accessor -%];
@@ -248,6 +277,7 @@ struct Indices_[% table %] getIndices_[% table %](View_[% table %] &v) {
         [% indexDef = tables.$table.indices.$index %]
         [% integer_index = indexDef.integer %]
         [% multi_index = indexDef.multi %]
+        [% altOrder_index = indexDef.altOrder %]
 
         _output.[% index %] = std::move([% index %]);
     [% END %]

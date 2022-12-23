@@ -78,6 +78,7 @@ foreach my $tableName (keys %{ $schema->{tables} }) {
         my $index = $table->{indices}->{$indexName};
         die "indices with multi and unique are not supported ($tableName.$indexName)" if $index->{multi} && $index->{unique};
         $index->{accessor} = $indexName if !$index->{accessor};
+        $index->{multi} = 1 if $index->{altOrder};
     }
 }
 

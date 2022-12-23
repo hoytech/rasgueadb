@@ -43,7 +43,7 @@ inline void generic_foreach(lmdb::txn &txn, lmdb::dbi &dbi, std::function<bool(u
 
 
 
-inline void generic_foreachByIndex(lmdb::txn &txn, lmdb::dbi &tableDbi, lmdb::dbi &indexDbi, std::optional<std::string_view> startKey, std::optional<std::string_view> indexKey, std::function<bool(uint64_t, std::string_view)> cb, bool reverse = false, uint64_t *count = nullptr) {
+inline void generic_foreachByIndex(lmdb::txn &txn, lmdb::dbi &tableDbi, lmdb::dbi &indexDbi, std::optional<std::string_view> startKey, std::optional<std::string_view> indexKey, std::function<bool(uint64_t, std::string_view)> cb, bool reverse = false, uint64_t *count = nullptr, bool altOrder = false) {
     if (count) *count = 0;
 
     auto cursorT = lmdb::cursor::open(txn, tableDbi);
@@ -75,7 +75,7 @@ inline void generic_foreachByIndex(lmdb::txn &txn, lmdb::dbi &tableDbi, lmdb::db
     }
 
     do {
-        uint64_t primaryKey = lmdb::from_sv<uint64_t>(v);
+        uint64_t primaryKey = altOrder ? extractAltOrderPrimary(v) : lmdb::from_sv<uint64_t>(v);
         std::string_view recordKey = lmdb::to_sv<uint64_t>(primaryKey), record;
         if (cursorT.get(recordKey, record, MDB_SET)) {
             if (!cb(primaryKey, record)) return;
@@ -86,7 +86,7 @@ inline void generic_foreachByIndex(lmdb::txn &txn, lmdb::dbi &tableDbi, lmdb::db
 }
 
 
-inline void generic_foreachDup(lmdb::txn &txn, lmdb::dbi &tableDbi, lmdb::dbi &indexDbi, std::string_view k, std::function<bool(uint64_t, std::string_view)> cb, bool reverse = false, uint64_t startingPoint = 0, uint64_t *count = nullptr, bool allow_dangling = false) {
+inline void generic_foreachDup(lmdb::txn &txn, lmdb::dbi &tableDbi, lmdb::dbi &indexDbi, std::string_view k, std::function<bool(uint64_t, std::string_view)> cb, bool reverse = false, uint64_t startingPoint = 0, uint64_t *count = nullptr, bool allow_dangling = false, bool altOrder = false) {
     std::string_view v;
 
     if (count) *count = 0;
@@ -120,7 +120,7 @@ inline void generic_foreachDup(lmdb::txn &txn, lmdb::dbi &tableDbi, lmdb::dbi &i
     if (count) *count = cursorI.count();
 
     do {
-        uint64_t primaryKey = lmdb::from_sv<uint64_t>(v);
+        uint64_t primaryKey = altOrder ? extractAltOrderPrimary(v) : lmdb::from_sv<uint64_t>(v);
         std::string_view recordKey = lmdb::to_sv<uint64_t>(primaryKey);
         std::string_view record;
         if (cursorT.get(recordKey, record, MDB_SET)) {
@@ -153,14 +153,14 @@ inline void foreach_[% table %]__[% indexName %](lmdb::txn &txn, std::function<b
     generic_foreachByIndex(txn, dbi_[% table %], dbi_[% table %]__[% indexName %], startKey ? std::optional<std::string_view>([% utils.index_conversion(indexDef) %](*startKey)) : std::nullopt, std::nullopt, [&](uint64_t primaryKeyId, std::string_view v){
         View_[% table %] view(primaryKeyId, v);
         return cb(view);
-    }, reverse, count);
+    }, reverse, count, [% IF indexDef.altOrder %]true[% ELSE %]false[% END %]);
 }
 
 inline void foreachDup_[% table %]__[% indexName %](lmdb::txn &txn, [% utils.index_name_to_type(indexDef) %] k, std::function<bool(View_[% table %]&)> cb, bool reverse = false, std::optional<uint64_t> startingPoint = std::nullopt, uint64_t *count = nullptr) {
     generic_foreachDup(txn, dbi_[% table %], dbi_[% table %]__[% indexName %], [% utils.index_conversion(indexDef) %](k), [&cb](uint64_t primaryKeyId, std::string_view v){
         View_[% table %] view(primaryKeyId, v);
         return cb(view);
-    }, reverse, startingPoint ? *startingPoint : 0, count);
+    }, reverse, startingPoint ? *startingPoint : 0, count, false, [% IF indexDef.altOrder %]true[% ELSE %]false[% END %]);
 }
 
 inline void foreachKey_[% table %]__[% indexName %](lmdb::txn &txn, std::function<bool([% utils.index_name_to_type(indexDef) %] k)> cb, bool reverse = false, std::optional<std::string_view> startKey = std::nullopt) {
