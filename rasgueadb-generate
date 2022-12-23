@@ -162,7 +162,17 @@ $schema->{utils} = {
 my $fbsFile = "$outputDir/$schema->{db}.schema.fbs";
 $tt->process("$FindBin::Bin/schema.fbs.tt", $schema, $fbsFile) || die $tt->error(), "\n";
 
-system(qw{flatc --cpp --reflect-names -o}, $outputDir, $fbsFile) && $!;
+{
+    open(my $fh, "-|", qw{flatc --cpp --reflect-names -o}, $outputDir, $fbsFile) || die "unable to run flatc: $!";
+
+    while (<$fh>) {
+        next if /warning: field names should be lowercase snake_case/;
+        print;
+    }
+
+    wait;
+    die "flatc failure" if $?;
+}
 
 my $hFile = "$outputDir/$schema->{db}.h";
 $tt->process("$FindBin::Bin/main.h.tt", $schema, $hFile) || die $tt->error(), "\n";
