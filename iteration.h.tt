@@ -86,7 +86,7 @@ inline void generic_foreachByIndex(lmdb::txn &txn, lmdb::dbi &tableDbi, lmdb::db
 }
 
 
-inline void generic_foreachDup(lmdb::txn &txn, lmdb::dbi &tableDbi, lmdb::dbi &indexDbi, std::string_view k, std::function<bool(uint64_t, std::string_view)> cb, bool reverse = false, uint64_t startingPoint = 0, uint64_t *count = nullptr, bool allow_dangling = false, bool altOrder = false) {
+inline void generic_foreachDup(lmdb::txn &txn, lmdb::dbi &tableDbi, lmdb::dbi &indexDbi, std::string_view k, std::function<bool(uint64_t, std::string_view)> cb, bool reverse = false, std::optional<std::string_view> startingPoint = std::nullopt, uint64_t *count = nullptr, bool allow_dangling = false, bool altOrder = false) {
     std::string_view v;
 
     if (count) *count = 0;
@@ -95,15 +95,14 @@ inline void generic_foreachDup(lmdb::txn &txn, lmdb::dbi &tableDbi, lmdb::dbi &i
     auto cursorI = lmdb::cursor::open(txn, indexDbi);
 
     if (startingPoint) {
-        v = lmdb::to_sv<uint64_t>(startingPoint);
+        v = *startingPoint;
 
         if (reverse) {
             if (!cursorI.get(k, v, MDB_GET_BOTH_RANGE)) {
                 if (!cursorI.get(k, v, MDB_SET)) return;
                 if (!cursorI.get(k, v, MDB_LAST_DUP)) return;
             } else {
-                uint64_t curr = lmdb::from_sv<uint64_t>(v);
-                if (curr > startingPoint) {
+                if (altOrder ? (v > startingPoint) : (lmdb::from_sv<uint64_t>(v) > lmdb::from_sv<uint64_t>(*startingPoint))) {
                     if (!cursorI.get(k, v, MDB_PREV_DUP)) return;
                 }
             }
@@ -156,11 +155,11 @@ inline void foreach_[% table %]__[% indexName %](lmdb::txn &txn, std::function<b
     }, reverse, count, [% IF indexDef.altOrder %]true[% ELSE %]false[% END %]);
 }
 
-inline void foreachDup_[% table %]__[% indexName %](lmdb::txn &txn, [% utils.index_name_to_type(indexDef) %] k, std::function<bool(View_[% table %]&)> cb, bool reverse = false, std::optional<uint64_t> startingPoint = std::nullopt, uint64_t *count = nullptr) {
+inline void foreachDup_[% table %]__[% indexName %](lmdb::txn &txn, [% utils.index_name_to_type(indexDef) %] k, std::function<bool(View_[% table %]&)> cb, bool reverse = false, std::optional<[% IF indexDef.altOrder %]std::string_view[% ELSE %]uint64_t[% END %]> startingPoint = std::nullopt, uint64_t *count = nullptr) {
     generic_foreachDup(txn, dbi_[% table %], dbi_[% table %]__[% indexName %], [% utils.index_conversion(indexDef) %](k), [&cb](uint64_t primaryKeyId, std::string_view v){
         View_[% table %] view(primaryKeyId, v);
         return cb(view);
-    }, reverse, startingPoint ? *startingPoint : 0, count, false, [% IF indexDef.altOrder %]true[% ELSE %]false[% END %]);
+    }, reverse, [% IF indexDef.altOrder %]startingPoint[% ELSE %]startingPoint ? std::optional<std::string_view>(lmdb::to_sv<uint64_t>(*startingPoint)) : std::nullopt[% END %], count, false, [% IF indexDef.altOrder %]true[% ELSE %]false[% END %]);
 }
 
 inline void foreachKey_[% table %]__[% indexName %](lmdb::txn &txn, std::function<bool([% utils.index_name_to_type(indexDef) %] k)> cb, bool reverse = false, std::optional<std::string_view> startKey = std::nullopt) {
