@@ -286,9 +286,30 @@ The test-suite has an example where a `words` field is split up into individual 
 
 
 
+## Composite Keys
+
+There is limited support for composite index keys. To use it, you must specify a custom comparator in the schema, and then create your index keys with a special function, like so:
+
+    indices:
+      descByCreated:
+        comparator: StringUint64
+
+    indexPrelude: |
+      descByCreated = makeKey_StringUint64(v.desc(), v.created());
+
+When iterating over the index, the index key can be accessed and parsed like so:
+
+    env.foreach_MyTable__descByCreated(txn, [&](auto &view, std::string_view indexKey){
+        ParsedKey_StringUint64 parsedKey(indexKey);
+        // use parsedKey.s and parsedKey.n
+    });
+
+
 ## OpLog
 
-A special table `OpLog` is automatically added to your schema. This is a record of modifications to the DB, and is useful for streaming updates to users, and/or for replication.
+**This feature is deprecated**
+
+The code has some legacy support for `OpLog`. It is not compiled in by default. This was a special table that served as a record of modifications to the DB, and was useful for streaming updates to users, replication, etc. We've since figured out better ways to do this, so we'll be removing this support eventually.
 
 
 
@@ -298,5 +319,3 @@ A special table `OpLog` is automatically added to your schema. This is a record 
 RasgueaDB © 2021 Doug Hoyte.
 
 2-clause BSD license. See the LICENSE file.
-
-Does this stuff interest you? Subscribe for news on my upcoming book: [Zero Copy](https://leanpub.com/zerocopy)!

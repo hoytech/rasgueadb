@@ -43,7 +43,7 @@ inline void generic_foreach(lmdb::txn &txn, lmdb::dbi &dbi, std::function<bool(u
 
 
 
-inline void generic_foreachByIndex(lmdb::txn &txn, lmdb::dbi &tableDbi, lmdb::dbi &indexDbi, std::optional<std::string_view> startKey, std::optional<std::string_view> indexKey, std::function<bool(uint64_t, std::string_view)> cb, bool reverse = false, uint64_t *count = nullptr) {
+inline void generic_foreachByIndex(lmdb::txn &txn, lmdb::dbi &tableDbi, lmdb::dbi &indexDbi, std::optional<std::string_view> startKey, std::optional<std::string_view> indexKey, std::function<bool(uint64_t, std::string_view, std::string_view)> cb, bool reverse = false, uint64_t *count = nullptr) {
     if (count) *count = 0;
 
     auto cursorT = lmdb::cursor::open(txn, tableDbi);
@@ -78,7 +78,7 @@ inline void generic_foreachByIndex(lmdb::txn &txn, lmdb::dbi &tableDbi, lmdb::db
         uint64_t primaryKey = lmdb::from_sv<uint64_t>(v);
         std::string_view recordKey = lmdb::to_sv<uint64_t>(primaryKey), record;
         if (cursorT.get(recordKey, record, MDB_SET)) {
-            if (!cb(primaryKey, record)) return;
+            if (!cb(primaryKey, record, k)) return;
         } else {
             //throw hoytech::error("broken index");
         }
@@ -149,11 +149,15 @@ inline void foreach_[% table %](lmdb::txn &txn, std::function<bool(View_[% table
 [% FOREACH indexName IN tables.$table.indices.keys.sort() %]
 [% indexDef = tables.$table.indices.$indexName %]
 
-inline void foreach_[% table %]__[% indexName %](lmdb::txn &txn, std::function<bool(View_[% table %]&)> cb, bool reverse = false, std::optional<[% utils.index_name_to_type(indexDef) %]> startKey = std::nullopt, uint64_t *count = nullptr) {
-    generic_foreachByIndex(txn, dbi_[% table %], dbi_[% table %]__[% indexName %], startKey ? std::optional<std::string_view>([% utils.index_conversion(indexDef) %](*startKey)) : std::nullopt, std::nullopt, [&](uint64_t primaryKeyId, std::string_view v){
+inline void foreach_[% table %]__[% indexName %](lmdb::txn &txn, std::function<bool(View_[% table %]&, std::string_view)> cb, bool reverse = false, std::optional<[% utils.index_name_to_type(indexDef) %]> startKey = std::nullopt, uint64_t *count = nullptr) {
+    generic_foreachByIndex(txn, dbi_[% table %], dbi_[% table %]__[% indexName %], startKey ? std::optional<std::string_view>([% utils.index_conversion(indexDef) %](*startKey)) : std::nullopt, std::nullopt, [&](uint64_t primaryKeyId, std::string_view v, std::string_view indexKey){
         View_[% table %] view(primaryKeyId, v);
-        return cb(view);
+        return cb(view, indexKey);
     }, reverse, count);
+}
+
+inline void foreach_[% table %]__[% indexName %](lmdb::txn &txn, std::function<bool(View_[% table %]&)> cb, bool reverse = false, std::optional<[% utils.index_name_to_type(indexDef) %]> startKey = std::nullopt, uint64_t *count = nullptr) {
+    foreach_[% table %]__[% indexName %](txn, [&](auto &view, std::string_view){ return cb(view); }, reverse, startKey, count);
 }
 
 inline void foreachDup_[% table %]__[% indexName %](lmdb::txn &txn, [% utils.index_name_to_type(indexDef) %] k, std::function<bool(View_[% table %]&)> cb, bool reverse = false, std::optional<uint64_t> startingPoint = std::nullopt, uint64_t *count = nullptr) {

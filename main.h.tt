@@ -14,14 +14,7 @@
 #include "[% db %].schema_generated.h"
 
 
-inline std::string_view sv(const flatbuffers::Vector<unsigned char> *p) {
-    return p ? std::string_view(reinterpret_cast<const char*>(p->data()), p->size()) : "";
-}
-
-inline std::string_view sv(const flatbuffers::String *p) {
-    return p ? std::string_view(reinterpret_cast<const char*>(p->data()), p->size()) : "";
-}
-
+[% INCLUDE utils.h.tt %]
 
 [% includes %]
 
@@ -90,6 +83,7 @@ class environment {
 
           [% FOREACH index IN tables.$table.indices.keys %]
             dbi_[% table %]__[% index %] = lmdb::dbi::open(txn, "rasgueadb_[% db %]__[% table %]__[% index %]", MDB_CREATE | MDB_DUPSORT | MDB_INTEGERDUP [% IF tables.$table.indices.$index.integer %]| MDB_INTEGERKEY[% END %]);
+            [% IF tables.$table.indices.$index.comparator %]dbi_[% table %]__[% index %].set_compare(txn, lmdb_comparator__[% tables.$table.indices.$index.comparator %]);[% END %]
           [% END %]
         [% END %]
 
