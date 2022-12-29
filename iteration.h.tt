@@ -36,6 +36,42 @@ inline void generic_foreachRaw(lmdb::txn &txn, lmdb::dbi &dbi, std::function<boo
     } while (cursor.get(k, v, traversal));
 }
 
+inline void generic_foreachFull(lmdb::txn &txn, lmdb::dbi &dbi, std::string_view startingPoint, std::string_view startingPointDup, std::function<bool(std::string_view, std::string_view)> cb, bool reverse = false) {
+    auto cursor = lmdb::cursor::open(txn, dbi);
+
+    std::string_view k = startingPoint, v = startingPointDup;
+
+    if (reverse) {
+        if (cursor.get(k, v, MDB_GET_BOTH_RANGE)) {
+            if (v != startingPointDup) {
+                if (!cursor.get(k, v, MDB_PREV)) return;
+            }
+        } else {
+            if (cursor.get(k, v, MDB_SET)) {
+                if (!cursor.get(k, v, MDB_LAST_DUP)) return;
+            } else {
+                if (!cursor.get(k, v, MDB_SET_RANGE)) return;
+                if (!cursor.get(k, v, MDB_PREV)) return;
+            }
+        }
+    } else {
+        if (!cursor.get(k, v, MDB_GET_BOTH_RANGE)) {
+            if (cursor.get(k, v, MDB_SET)) {
+                if (!cursor.get(k, v, MDB_NEXT_NODUP)) return;
+            } else {
+                if (!cursor.get(k, v, MDB_SET_RANGE)) return;
+                if (!cursor.get(k, v, MDB_FIRST_DUP)) return;
+            }
+        }
+    }
+
+    MDB_cursor_op traversal = reverse ? MDB_PREV : MDB_NEXT;
+
+    do {
+        if (!cb(k, v)) return;
+    } while (cursor.get(k, v, traversal));
+}
+
 
 inline void generic_foreach(lmdb::txn &txn, lmdb::dbi &dbi, std::function<bool(uint64_t, std::string_view)> cb, bool reverse = false, uint64_t startingPoint = 0) {
     generic_foreachRaw(txn, dbi, [&cb](std::string_view k, std::string_view v){ return cb(lmdb::from_sv<uint64_t>(k), v); }, reverse, startingPoint ? std::optional<std::string_view>(lmdb::to_sv<uint64_t>(startingPoint)) : std::nullopt);
