@@ -50,8 +50,11 @@ inline void generic_foreachFull(lmdb::txn &txn, lmdb::dbi &dbi, std::string_view
             if (cursor.get(k, v, MDB_SET)) {
                 if (!cursor.get(k, v, MDB_LAST_DUP)) return;
             } else {
-                if (!cursor.get(k, v, MDB_SET_RANGE)) return;
-                if (!cursor.get(k, v, MDB_PREV)) return;
+                if (cursor.get(k, v, MDB_SET_RANGE)) {
+                    if (!cursor.get(k, v, MDB_PREV)) return;
+                } else {
+                    if (!cursor.get(k, v, MDB_LAST)) return;
+                }
             }
         }
     } else {
