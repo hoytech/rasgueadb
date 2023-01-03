@@ -1,6 +1,6 @@
-namespace [% db %];
-
 [% flatBuffers %]
+
+namespace [% db %];
 
 [% FOREACH tableName IN tables.keys %]
   [% table = tables.$tableName %]

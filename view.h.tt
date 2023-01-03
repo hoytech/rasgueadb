@@ -34,7 +34,7 @@ class View_[% table %] {
       }
 
       [% IF field.nestedFlat %]
-          const [% db %]::[% field.nestedFlat %] *[% field.name %]_nested() {
+          const [% field.nestedFlatCppNamespace %] *[% field.name %]_nested() {
               return v->[% field.name %]_nested_root();
           }
       [% END %]

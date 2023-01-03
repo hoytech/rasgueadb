@@ -48,6 +48,8 @@ foreach my $tableName (keys %{ $schema->{tables} }) {
 
     foreach my $field (@{ $table->{fields} }) {
         if ($field->{nestedFlat}) {
+            $field->{nestedFlatCppNamespace} = $field->{nestedFlat};
+            $field->{nestedFlatCppNamespace} =~ s/[.]/::/g;
             $field->{attributes} = qq{ (nested_flatbuffer: "$field->{nestedFlat}")};
         }
     }
