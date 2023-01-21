@@ -46,6 +46,10 @@ class environment {
       [% END %]
     [% END %]
 
+    [% FOREACH table IN tablesRaw.keys %]
+      lmdb::dbi dbi_[% table %];
+    [% END %]
+
     [% IF quadrable %]
         lmdb::dbi dbiQuadrable_head;
         lmdb::dbi dbiQuadrable_nodesLeaf;
@@ -90,6 +94,10 @@ class environment {
             dbi_[% table %]__[% index %] = lmdb::dbi::open(txn, "rasgueadb_[% db %]__[% table %]__[% index %]", MDB_CREATE | MDB_DUPSORT | MDB_INTEGERDUP [% IF tables.$table.indices.$index.integer %]| MDB_INTEGERKEY[% END %]);
             [% IF tables.$table.indices.$index.comparator %]dbi_[% table %]__[% index %].set_compare(txn, lmdb_comparator__[% tables.$table.indices.$index.comparator %]);[% END %]
           [% END %]
+        [% END %]
+
+        [% FOREACH table IN tablesRaw.keys %]
+          dbi_[% table %] = lmdb::dbi::open(txn, "rasgueadb_[% db %]__[% table %]", MDB_CREATE | ([% tablesRaw.$table.flags || '0' %]));
         [% END %]
 
         [% IF quadrable %]
