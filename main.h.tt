@@ -39,7 +39,6 @@ class environment {
     // Table definitions
 
     [% FOREACH table IN tables.keys %]
-      static constexpr uint64_t tableId_[% table %] = [% tables.$table.tableId %];
       lmdb::dbi dbi_[% table %];
 
       [% FOREACH indexName IN tables.$table.indices.keys %]
@@ -163,28 +162,6 @@ class environment {
         return output;
     }
 
-
-
-    [% IF opLog %]
-        // OpLog stuff
-
-        inline uint64_t curr_oplog_id(environment &env, lmdb::txn &txn) {
-            return get_largest_integer_key_or_zero(txn, env.dbi_OpLog);
-        }
-
-        class View_OpLog;
-
-        inline void process_new_oplogs(lmdb::txn &txn, std::function<bool(uint64_t, View_OpLog &)> cb, uint64_t lastProcessedOpLogId) {
-            generic_foreachRaw(txn, dbi_OpLog, [&](std::string_view k, std::string_view v){
-                uint64_t opLogId = lmdb::from_sv<uint64_t>(k);
-                View_OpLog op(opLogId, v);
-
-                if (opLogId == lastProcessedOpLogId) return true; // already processed
-
-                return cb(opLogId, op);
-            }, false, lmdb::to_sv<uint64_t>(lastProcessedOpLogId));
-        }
-    [% END %]
 
 
     // Includes

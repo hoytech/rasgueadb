@@ -30,14 +30,8 @@ my $schema = YAML::LoadFile($schemaFile);
 
     die "db name can't include '__': $schema->{db}" if $schema->{db} =~ /__/;
 
-    my $tableIds = {};
-
     foreach my $tableName (keys %{ $schema->{tables} }) {
-        my $tableId = $schema->{tables}->{$tableName}->{tableId};
-        die "invalid tableId: $tableId (in reserved range)" if $tableId >= 1_000_000 && $tableId < 1_100_000;
         die "table names can't include '__': $tableName" if $tableName =~ /__/;
-        die "duplicate tableId: $tableId in $tableName" if $tableIds->{$tableId};
-        $tableIds->{$tableId}++;
     }
 }
 
@@ -81,30 +75,6 @@ foreach my $tableName (keys %{ $schema->{tables} }) {
         die "indices with multi and unique are not supported ($tableName.$indexName)" if $index->{multi} && $index->{unique};
         $index->{accessor} = $indexName if !$index->{accessor};
     }
-}
-
-## Add internal tables
-
-if ($schema->{opLog}) {
-    $schema->{tables}->{OpLog} = {
-        tableId => 1_000_000,
-        noOplog => 1,
-        fields => [
-            {
-                name => 'opType',
-                type => 'uint8',  # 0=insert  1=update  2=delete
-            },
-            {
-                name => 'tableId',
-            },
-            {
-                name => 'recordId',
-            },
-            {
-                name => 'timestamp',
-            },
-        ],
-    };
 }
 
 

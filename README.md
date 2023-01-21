@@ -15,8 +15,6 @@ Here is a simple example schema:
 
     tables:
       User:
-        tableId: 1
-
         fields:
           - name: userName
             type: string
@@ -29,8 +27,7 @@ Here is a simple example schema:
             ## default type is uint64
 
 * The `db` field is a name for your database. It will be used for namespacing in the generated files and the database table names.
-* Each table should have a numeric `tableId`. This is used to track updates in the OpLog.
-* For now there are 3 types supported:
+* For now there are 3 field types supported:
   * `uint64`: Unsigned 64-bit integer. This is the default when no type is specified.
   * `string`: Arbitrary byte-string.
   * `ubytes`: Identical to `string`, except for how it is displayed when debugging.
@@ -94,8 +91,6 @@ Every record has a primary key of type `uint64`. By default these are autogenera
 Instead of using the auto-generated ids, you can specify a field to use as the primary key instead. This field must be of type `uint64`:
 
       Address:
-        tableId: 2
-
         primaryKey: userId
 
         fields:
@@ -252,8 +247,6 @@ Although you can make a particular field indexed by adding an `index` key to the
 As an example, here is definition of a table that maintains indices of its two fields in lower-case:
 
       Person:
-        tableId: 2
-
         fields:
           - name: fullName
             type: string
@@ -303,14 +296,6 @@ When iterating over the index, the index key can be accessed and parsed like so:
         ParsedKey_StringUint64 parsedKey(indexKey);
         // use parsedKey.s and parsedKey.n
     });
-
-
-## OpLog
-
-**This feature is deprecated**
-
-The code has some legacy support for `OpLog`. It is not compiled in by default. This was a special table that served as a record of modifications to the DB, and was useful for streaming updates to users, replication, etc. We've since figured out better ways to do this, so we'll be removing this support eventually.
-
 
 
 
