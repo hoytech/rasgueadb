@@ -91,7 +91,7 @@ class environment {
           dbi_[% table %] = lmdb::dbi::open(txn, "rasgueadb_[% db %]__[% table %]", MDB_CREATE | MDB_INTEGERKEY);
 
           [% FOREACH index IN tables.$table.indices.keys %]
-            dbi_[% table %]__[% index %] = lmdb::dbi::open(txn, "rasgueadb_[% db %]__[% table %]__[% index %]", MDB_CREATE | MDB_DUPSORT | MDB_INTEGERDUP [% IF tables.$table.indices.$index.integer %]| MDB_INTEGERKEY[% END %]);
+            dbi_[% table %]__[% index %] = lmdb::dbi::open(txn, "rasgueadb_[% db %]__[% table %]__[% index %]", MDB_CREATE | MDB_DUPSORT | MDB_INTEGERDUP | MDB_DUPFIXED [% IF tables.$table.indices.$index.integer %]| MDB_INTEGERKEY[% END %]);
             [% IF tables.$table.indices.$index.comparator %]dbi_[% table %]__[% index %].set_compare(txn, lmdb_comparator__[% tables.$table.indices.$index.comparator %]);[% END %]
           [% END %]
         [% END %]
