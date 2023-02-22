@@ -36,7 +36,7 @@ inline void generic_foreachRaw(lmdb::txn &txn, lmdb::dbi &dbi, std::function<boo
     } while (cursor.get(k, v, traversal));
 }
 
-inline void generic_foreachFull(lmdb::txn &txn, lmdb::dbi &dbi, std::string_view startingPoint, std::string_view startingPointDup, std::function<bool(std::string_view, std::string_view)> cb, bool reverse = false) {
+inline bool generic_foreachFull(lmdb::txn &txn, lmdb::dbi &dbi, std::string_view startingPoint, std::string_view startingPointDup, std::function<bool(std::string_view, std::string_view)> cb, bool reverse = false) {
     auto cursor = lmdb::cursor::open(txn, dbi);
 
     std::string_view k = startingPoint, v = startingPointDup;
@@ -44,26 +44,26 @@ inline void generic_foreachFull(lmdb::txn &txn, lmdb::dbi &dbi, std::string_view
     if (reverse) {
         if (cursor.get(k, v, MDB_GET_BOTH_RANGE)) {
             if (v != startingPointDup) {
-                if (!cursor.get(k, v, MDB_PREV)) return;
+                if (!cursor.get(k, v, MDB_PREV)) return true;
             }
         } else {
             if (cursor.get(k, v, MDB_SET)) {
-                if (!cursor.get(k, v, MDB_LAST_DUP)) return;
+                if (!cursor.get(k, v, MDB_LAST_DUP)) return true;
             } else {
                 if (cursor.get(k, v, MDB_SET_RANGE)) {
-                    if (!cursor.get(k, v, MDB_PREV)) return;
+                    if (!cursor.get(k, v, MDB_PREV)) return true;
                 } else {
-                    if (!cursor.get(k, v, MDB_LAST)) return;
+                    if (!cursor.get(k, v, MDB_LAST)) return true;
                 }
             }
         }
     } else {
         if (!cursor.get(k, v, MDB_GET_BOTH_RANGE)) {
             if (cursor.get(k, v, MDB_SET)) {
-                if (!cursor.get(k, v, MDB_NEXT_NODUP)) return;
+                if (!cursor.get(k, v, MDB_NEXT_NODUP)) return true;
             } else {
-                if (!cursor.get(k, v, MDB_SET_RANGE)) return;
-                if (!cursor.get(k, v, MDB_FIRST_DUP)) return;
+                if (!cursor.get(k, v, MDB_SET_RANGE)) return true;
+                if (!cursor.get(k, v, MDB_FIRST_DUP)) return true;
             }
         }
     }
@@ -71,8 +71,10 @@ inline void generic_foreachFull(lmdb::txn &txn, lmdb::dbi &dbi, std::string_view
     MDB_cursor_op traversal = reverse ? MDB_PREV : MDB_NEXT;
 
     do {
-        if (!cb(k, v)) return;
+        if (!cb(k, v)) return false;
     } while (cursor.get(k, v, traversal));
+
+    return true;
 }
 
 
