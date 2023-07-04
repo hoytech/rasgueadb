@@ -149,7 +149,7 @@ uint64_t insert_[% table %](lmdb::txn &txn,
             primaryKeyId = get_next_integer_key(txn, dbi_[% table %]);
         [% END %]
 
-        bool inserted = dbi_[% table %].put(txn, lmdb::to_sv<uint64_t>(primaryKeyId), buf, MDB_NOOVERWRITE);
+        bool inserted = dbi_[% table %].put(txn, lmdb::to_sv<uint64_t>(primaryKeyId), buf, MDB_NOOVERWRITE | MDB_APPEND);
         if (!inserted) throw hoytech::error("duplicate insert into [% table %]");
     }
 
