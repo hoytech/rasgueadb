@@ -74,7 +74,7 @@ class environment {
 
     lmdb::env lmdb_env = lmdb::env::create();
 
-    void open(std::string dir, bool setDefaults = true) {
+    void open(std::string dir, bool setDefaults = true, unsigned int flags = 0) {
         if (envInited) throw hoytech::error("rasgueadb environment already opened");
 
         if (setDefaults) {
@@ -83,7 +83,7 @@ class environment {
             lmdb_env.set_mapsize(1UL * 1024UL * 1024UL * 1024UL * 1024UL);
         }
 
-        lmdb_env.open(dir.c_str(), MDB_CREATE, 0664);
+        lmdb_env.open(dir.c_str(), MDB_CREATE | flags, 0664);
 
         lmdb_env.reader_check();
 
