@@ -1,5 +1,8 @@
 #pragma once
 
+#include <unistd.h>
+#include <fcntl.h>
+
 #include <functional>
 #include <string_view>
 #include <optional>
@@ -86,6 +89,9 @@ class environment {
         lmdb_env.open(dir.c_str(), MDB_CREATE | flags, 0664);
 
         lmdb_env.reader_check();
+
+
+        if (fcntl(lmdb_env.get_fd(), F_SETFD, FD_CLOEXEC) == -1) throw hoytech::error("unable to enable CLOEXEC on LMDB fd");
 
 
         auto txn = txn_rw();
