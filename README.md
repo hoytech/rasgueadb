@@ -299,8 +299,33 @@ When iterating over the index, the index key can be accessed and parsed like so:
 
 
 
+## Opaque Tables
+
+Tables marked as opaque do not have flatbuffers tables created for them. Instead, RasgueaDB considers their contents opaque string blobs. In order to index these tables, you must parse out the indexable fields yourself.
+
+    MyOpaqueTable:
+      opaque: true
+
+      indices:
+        someStr: true
+
+      indexPrelude: |
+        if (v.buf.size() >= 2) someStr = std::string(v.buf.substr(0,2));
+
+
+## Raw Tables
+
+The section `tablesRaw` can be used to add DBIs that will be created when instantiating the LMDB environment, but otherwise are untouched by RasgueaDB. By default they only have the `MDB_CREATE` flag, so if you want any other flags you need to provide them in `flags`:
+
+    tablesRaw:
+      MyRawTable:
+        flags: 'MDB_INTEGERKEY'
+
+In your application code, the DBI will be available at `env.dbi_MyRawTable`.
+
+
 ## Author and Copyright
 
-RasgueaDB © 2021 Doug Hoyte.
+RasgueaDB © 2021-2023 Doug Hoyte.
 
-2-clause BSD license. See the LICENSE file.
+MIT license. See the LICENSE file.
