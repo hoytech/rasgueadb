@@ -53,12 +53,6 @@ class environment {
       lmdb::dbi dbi_[% table %];
     [% END %]
 
-    [% IF quadrable %]
-        lmdb::dbi dbiQuadrable_head;
-        lmdb::dbi dbiQuadrable_nodesLeaf;
-        lmdb::dbi dbiQuadrable_nodesInterior;
-    [% END %]
-
     lmdb::dbi lookupDbi(std::string_view name) {
         if (!envInited) throw hoytech::error("rasgueadb environment not yet opened");
 
@@ -107,12 +101,6 @@ class environment {
 
         [% FOREACH table IN tablesRaw.keys %]
           dbi_[% table %] = lmdb::dbi::open(txn, "rasgueadb_[% db %]__[% table %]", MDB_CREATE | ([% tablesRaw.$table.flags || '0' %]));
-        [% END %]
-
-        [% IF quadrable %]
-            dbiQuadrable_head = lmdb::dbi::open(txn, "quadrable_head", MDB_CREATE);
-            dbiQuadrable_nodesLeaf = lmdb::dbi::open(txn, "quadrable_nodesLeaf", MDB_CREATE | MDB_INTEGERKEY);
-            dbiQuadrable_nodesInterior = lmdb::dbi::open(txn, "quadrable_nodesInterior", MDB_CREATE | MDB_INTEGERKEY);
         [% END %]
 
         {
