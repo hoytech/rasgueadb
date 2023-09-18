@@ -3,6 +3,8 @@
 use strict;
 
 use FindBin;
+use IPC::Open3;
+use Symbol 'gensym';
 use Data::Dumper;
 
 use YAML;
@@ -135,12 +137,17 @@ my $fbsFile = "$outputDir/$schema->{db}.schema.fbs";
 $tt->process("$FindBin::Bin/schema.fbs.tt", $schema, $fbsFile) || die $tt->error(), "\n";
 
 {
-    open(my $fh, "-|", qw{flatc --cpp --reflect-names -o}, $outputDir, $fbsFile) || die "unable to run flatc: $!";
+    open3(undef, my $fh = gensym, my $fh2 = gensym, qw{flatc --cpp --reflect-names -o}, $outputDir, $fbsFile) || die "unable to run flatc: $!";
 
-    while (<$fh>) {
+    my $printer = sub {
         next if /warning: field names should be lowercase snake_case/;
-        print;
-    }
+        next if /^warning:$/;
+        next if /^\s*$/;
+        print "FLATC: $_";
+    };
+
+    while (<$fh>) { $printer->(); }
+    while (<$fh2>) { $printer->(); }
 
     wait;
     die "flatc failure" if $?;
