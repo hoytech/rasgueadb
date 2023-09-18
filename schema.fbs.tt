@@ -4,6 +4,7 @@ namespace [% db %];
 
 [% FOREACH tableName IN tables.keys %]
   [% table = tables.$tableName %]
+  [% NEXT IF table.opaque %]
   table [% tableName %] {
     [% FOREACH field IN table.fields %]
       [% field.name %]: [% utils.type_to_flatbuffers(field.type) %][% field.attributes %];

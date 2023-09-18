@@ -4,7 +4,7 @@
 
 class View_[% table %] {
   public:
-    View_[% table %](uint64_t primaryKeyId_, std::string_view buf_) : primaryKeyId(primaryKeyId_), buf(buf_), v(flatbuffers::GetRoot<[% db %]::[% table %]>(buf_.data())) {}
+    View_[% table %](uint64_t primaryKeyId_, std::string_view buf_) : primaryKeyId(primaryKeyId_), buf(buf_)[% IF !tables.$table.opaque %], v(flatbuffers::GetRoot<[% db %]::[% table %]>(buf_.data()))[% END %] {}
 
     [% FOREACH field IN tables.$table.fields %]
       [% utils.type_to_cpp(field.type) %] [% field.name %]() {
@@ -40,15 +40,19 @@ class View_[% table %] {
       [% END %]
     [% END %]
 
+    [% IF !tables.$table.opaque %]
     std::string _str() {
         return flatbuffers::FlatBufferToString((const unsigned char*)buf.data(), [% db %]::[% table %]TypeTable());
     }
+    [% END %]
 
     uint64_t primaryKeyId;
     std::string_view buf;
 
   private:
+    [% IF !tables.$table.opaque %]
     const [% db %]::[% table %] *v;
+    [% END %]
 };
 
 [% END %]

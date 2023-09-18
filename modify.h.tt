@@ -93,9 +93,14 @@ uint64_t insert_[% table %](lmdb::txn &txn,
   [% FOREACH field IN tables.$table.fields %]
     [% utils.type_to_cpp(field.type) %] param__[% field.name %],
   [% END %]
+  [% IF tables.$table.opaque %]
+    [% IF tables.$table.primaryKey %] uint64_t param__[% tables.$table.primaryKey %], [% END %]
+    std::string_view buf,
+  [% END %]
   std::optional<View_[% table %]> prev = std::nullopt
 ) {
 
+  [% IF !tables.$table.opaque %]
     flatbuffers::FlatBufferBuilder builder;
 
     {
@@ -128,6 +133,7 @@ uint64_t insert_[% table %](lmdb::txn &txn,
     }
 
     auto buf = std::string_view(reinterpret_cast<char*>(builder.GetBufferPointer()), builder.GetSize());
+  [% END %]
 
 
     uint64_t primaryKeyId;
@@ -165,6 +171,8 @@ uint64_t insert_[% table %](lmdb::txn &txn,
 
 
 
+[% IF !tables.$table.opaque %]
+
 struct Updates_[% table %] {
   [% FOREACH field IN tables.$table.fields %]
     std::optional<[% utils.type_to_cpp(field.type) %]> [% field.name %];
@@ -175,6 +183,7 @@ uint64_t update_[% table %](lmdb::txn &txn, View_[% table %] prev, Updates_[% ta
     return insert_[% table %](txn, [% FOREACH field IN tables.$table.fields %]upd.[% field.name %] ? *upd.[% field.name %] : prev.[% field.name %](), [% END %]prev);
 }
 
+[% END %]
 
 
 

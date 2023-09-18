@@ -42,6 +42,8 @@ my $schema = YAML::LoadFile($schemaFile);
 foreach my $tableName (keys %{ $schema->{tables} }) {
     my $table = $schema->{tables}->{$tableName};
 
+    die "opaque tables cannot have 'fields'" if $table->{opaque} && @{ $table->{fields} || [] };
+
     foreach my $field (@{ $table->{fields} }) {
         if ($field->{nestedFlat}) {
             $field->{nestedFlatCppNamespace} = $field->{nestedFlat};
