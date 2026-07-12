@@ -1,7 +1,14 @@
 #pragma once
 
+#ifdef _WIN32
+#include <io.h>
+#include <windows.h>
+#include <winioctl.h>
+#include <direct.h>
+#else
 #include <unistd.h>
 #include <fcntl.h>
+#endif
 
 #include <functional>
 #include <string_view>
@@ -80,12 +87,27 @@ class environment {
             lmdb_env.set_mapsize(1UL * 1024UL * 1024UL * 1024UL * 1024UL);
         }
 
+#ifdef _WIN32
+        {
+            std::string dbFile = dir + "/data.mdb";
+            ::_mkdir(dir.c_str());
+            HANDLE hFile = ::CreateFileA(dbFile.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+            if (hFile != INVALID_HANDLE_VALUE) {
+                DWORD bytesReturned = 0;
+                ::DeviceIoControl(hFile, FSCTL_SET_SPARSE, NULL, 0, NULL, 0, &bytesReturned, NULL);
+                ::CloseHandle(hFile);
+            }
+        }
+#endif
+
         lmdb_env.open(dir.c_str(), MDB_CREATE | flags, 0664);
 
         lmdb_env.reader_check();
 
 
+#ifndef _WIN32
         if (fcntl(lmdb_env.get_fd(), F_SETFD, FD_CLOEXEC) == -1) throw hoytech::error("unable to enable CLOEXEC on LMDB fd");
+#endif
 
 
         auto txn = txn_rw();
@@ -112,7 +134,13 @@ class environment {
         envInited = true;
     }
 
+#ifdef _WIN32
+    void copy_fd(int fd) {
+        lmdb::env_copy_fd(lmdb_env, (mdb_filehandle_t)::_get_osfhandle(fd), MDB_CP_COMPACT);
+    }
+#else
     void copy_fd(int fd) { lmdb::env_copy_fd(lmdb_env, fd, MDB_CP_COMPACT); }
+#endif
 
 
 
