@@ -91,11 +91,28 @@ class environment {
         {
             std::string dbFile = dir + "/data.mdb";
             ::_mkdir(dir.c_str());
+
+            char volumePath[MAX_PATH];
+            if (::GetVolumePathNameA(dir.c_str(), volumePath, MAX_PATH)) {
+                DWORD fileSystemFlags = 0;
+                if (::GetVolumeInformationA(volumePath, NULL, 0, NULL, NULL, &fileSystemFlags, NULL, 0)) {
+                    if (!(fileSystemFlags & FILE_SUPPORTS_SPARSE_FILES)) {
+                        throw hoytech::error("rasgueadb error: Windows filesystem at '", dir, "' does not support sparse files (FILE_SUPPORTS_SPARSE_FILES), which is required for LMDB");
+                    }
+                }
+            }
+
             HANDLE hFile = ::CreateFileA(dbFile.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-            if (hFile != INVALID_HANDLE_VALUE) {
-                DWORD bytesReturned = 0;
-                ::DeviceIoControl(hFile, FSCTL_SET_SPARSE, NULL, 0, NULL, 0, &bytesReturned, NULL);
-                ::CloseHandle(hFile);
+            if (hFile == INVALID_HANDLE_VALUE) {
+                throw hoytech::error("rasgueadb error: Unable to create or open data.mdb to set sparse flag");
+            }
+            
+            DWORD bytesReturned = 0;
+            BOOL result = ::DeviceIoControl(hFile, FSCTL_SET_SPARSE, NULL, 0, NULL, 0, &bytesReturned, NULL);
+            ::CloseHandle(hFile);
+
+            if (!result) {
+                throw hoytech::error("rasgueadb error: FSCTL_SET_SPARSE failed on data.mdb. This is required on Windows to prevent massive disk allocation.");
             }
         }
 #endif
